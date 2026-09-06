@@ -520,8 +520,13 @@ table.results tr:last-child td{border-bottom:none;}
   </div>
 </div>
 <div class="toast-wrap" id="toastWrap"></div>
+<div id="authScreen" style="display:none"></div>
 
 <script>
+// Capturé avant toute chose : Supabase consomme le hash de l'URL (jeton
+// d'invitation / de réinitialisation) très tôt, donc on le garde de côté.
+const initialAuthHash = window.location.hash;
+
 /* ======================================================================
    ICONS — minimal inline SVG set (stroke-based, currentColor via stroke)
    ====================================================================== */
@@ -574,7 +579,7 @@ function icon(name,cls='icon',stroke='currentColor'){
    Exécutez d'abord le script SQL fourni (schema.sql) dans l'éditeur SQL
    de votre projet Supabase pour créer les tables nécessaires.
    ====================================================================== */
-const SUPABASE_URL = 'https://VOTRE-PROJET.supabase.co';
+const SUPABASE_URL = 'https://xnudovkpzolgpkmgzxfr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhudWRvdmtwem9sZ3BrbWd6eGZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3MjI4ODIsImV4cCI6MjEwNDI5ODg4Mn0.Uk9on4jovU-p6rKq_7D7CDrUfcDDNjmJH-oFXOg5nNc';
 const supabaseReady = typeof window.supabase !== 'undefined'
   && SUPABASE_URL.includes('supabase.co')
@@ -654,6 +659,12 @@ async function loadFromSupabase(){
   DB.tasks = (tasksRes.data||[]).map(mapTaskFromDb);
   DB.notifications = (notifRes.data||[]).map(mapNotifFromDb);
 }
+async function loadProfiles(){
+  if(!sb) return;
+  const {data,error} = await sb.from('profiles').select('*').order('created_at',{ascending:true});
+  if(error){ console.error(error); toast("Impossible de charger la liste des membres."); return; }
+  DB.users = (data||[]).map(p=>({id:p.id, name:p.name, role:p.role, fonction:p.fonction||'', email:p.email}));
+}
 
 /* ======================================================================
    DATA LAYER — in-memory "database" (persistée dans Supabase quand
@@ -681,13 +692,7 @@ function timeAgo(ts){
 }
 
 const DB = {
-  users:[
-    {id:'u1',name:'Mamadou Diop',role:'coordinateur',fonction:'Coordinateur de projet',email:'mamadou.diop@entreprise.sn'},
-    {id:'u2',name:'Aïssatou Ndiaye',role:'membre',fonction:'Chargée de projet',email:'aissatou.ndiaye@entreprise.sn'},
-    {id:'u3',name:'Cheikh Fall',role:'membre',fonction:'Chargé de suivi-évaluation',email:'cheikh.fall@entreprise.sn'},
-    {id:'u4',name:'Fatou Sarr',role:'membre',fonction:'Animatrice terrain',email:'fatou.sarr@entreprise.sn'},
-    {id:'u5',name:'Ibrahima Sy',role:'membre',fonction:'Logisticien',email:'ibrahima.sy@entreprise.sn'},
-  ],
+  users:[], // chargé depuis la table "profiles" (liée à Supabase Auth) — plus d'utilisateurs fictifs, voir loadProfiles()
   reports:[],
   tasks:[],
   // Liste des responsables de mission : gérée exclusivement par le coordinateur.
@@ -822,11 +827,12 @@ DB.tasks.push(
    APP STATE
    ====================================================================== */
 const state = {
-  currentUserId:'u2',
-  view:'dashboard',     // dashboard | reports | report-detail | new-report | tasks
+  currentUserId:null,   // défini après connexion (id Supabase Auth de l'utilisateur)
+  view:'dashboard',     // dashboard | reports | report-detail | new-report | tasks | membres
   reportFilter:'tous',
   activeReportId:null,
 };
+let pendingPasswordSetup = false; // true si l'utilisateur arrive via un lien d'invitation / réinitialisation
 function currentUser(){return userById(state.currentUserId);}
 
 function setView(view,params={}){
@@ -906,6 +912,9 @@ function renderSidebar(){
         <div class="nav-section-label">Administration</div>
         <button class="nav-item ${state.view==='responsables'?'active':''}" data-nav="responsables">
           ${icon('users')}<span>Responsables</span>
+        </button>
+        <button class="nav-item ${state.view==='membres'?'active':''}" data-nav="membres">
+          ${icon('usersBadge')}<span>Membres du bureau</span>
         </button>` : ''}
     </nav>
     <div class="sidebar-footer">
@@ -917,9 +926,8 @@ function renderSidebar(){
             <div class="r">${u.fonction}</div>
           </div>
         </div>
-        <select class="role-switch" id="userSwitch">
-          ${DB.users.map(x=>`<option value="${x.id}" ${x.id===u.id?'selected':''}>${x.name} — ${x.role==='coordinateur'?'Coordinateur':'Membre'}</option>`).join('')}
-        </select>
+        <div class="badge badge-green" style="width:100%;justify-content:center;box-sizing:border-box;">${u.role==='coordinateur'?'Coordinateur':'Membre'}</div>
+        <button class="btn btn-outline" id="logoutBtn" style="width:100%;margin-top:9px;justify-content:center;">${icon('x','icon-sm')} Déconnexion</button>
         <div style="display:flex;align-items:center;gap:6px;margin-top:9px;font-size:10.5px;color:${supabaseReady?'#00833F':'#8B94A3'};">
           <span style="width:7px;height:7px;border-radius:50%;background:${supabaseReady?'#00833F':'#C82A2B'};display:inline-block;"></span>
           ${supabaseReady?'Connecté à Supabase':'Mode démo (non sauvegardé)'}
@@ -928,7 +936,7 @@ function renderSidebar(){
     </div>
   `;
   document.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>setView(b.dataset.nav));
-  document.getElementById('userSwitch').onchange=(e)=>{state.currentUserId=e.target.value;render();};
+  document.getElementById('logoutBtn').onclick=()=>logout();
 }
 
 function renderTopbar(){
@@ -1557,6 +1565,98 @@ function wireResponsables(){
 }
 
 /* ======================================================================
+   VIEW: MEMBRES DU BUREAU — invitation par e-mail (réservé au coordinateur)
+   ====================================================================== */
+function viewMembres(){
+  const u=currentUser();
+  if(u.role!=='coordinateur'){
+    return `<div class="empty-state"><div class="t">Accès réservé au coordinateur</div><div class="d">La gestion des membres du bureau est réservée au coordinateur.</div></div>`;
+  }
+  return `
+    <div class="page-head">
+      <div>
+        <h1>Membres du bureau</h1>
+        <div class="sub">Ajoutez un membre : il recevra un e-mail avec un lien pour créer son mot de passe et activer son compte.</div>
+      </div>
+      <button class="btn btn-primary" id="addMembreBtn">${icon('plus')} Ajouter un membre</button>
+    </div>
+    <div class="card card-pad">
+      ${DB.users.length ? `
+        <table class="tasks-table">
+          <thead><tr><th>Membre</th><th>Fonction</th><th>E-mail</th><th>Rôle</th></tr></thead>
+          <tbody>
+            ${DB.users.map(m=>`
+              <tr>
+                <td><div class="resp-name-cell"><div class="resp-avatar" style="background:${colorFor(m.id)}">${initials(m.name)}</div><strong>${m.name}</strong>${m.id===u.id?' <span class="hint">(vous)</span>':''}</div></td>
+                <td>${m.fonction||'—'}</td>
+                <td>${m.email||'—'}</td>
+                <td><span class="badge ${m.role==='coordinateur'?'badge-green':'badge-gray'}">${m.role==='coordinateur'?'Coordinateur':'Membre'}</span></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      ` : `<div class="empty-state"><div class="t">Aucun membre pour l'instant</div><div class="d">Cliquez sur « Ajouter un membre » pour envoyer la première invitation.</div></div>`}
+    </div>`;
+}
+
+function wireMembres(){
+  const u=currentUser();
+  if(u.role!=='coordinateur') return;
+  const addBtn=document.getElementById('addMembreBtn');
+  if(!addBtn) return;
+  addBtn.onclick=()=>{
+    const overlay=document.createElement('div'); overlay.className='modal-overlay';
+    overlay.innerHTML=`<div class="modal-card"><div class="modal-head"><h3>Ajouter un membre</h3><button class="icon-btn" id="membreClose">${icon('x','icon-sm')}</button></div><div class="modal-body">
+      <div class="field"><label>Nom complet <span style="color:var(--red-600)">*</span></label><input type="text" id="membre-name" placeholder="Ex : Fatou Sarr" autofocus></div>
+      <div class="field"><label>Fonction</label><input type="text" id="membre-fonction" placeholder="Ex : Animatrice terrain"></div>
+      <div class="field"><label>E-mail <span style="color:var(--red-600)">*</span></label><input type="email" id="membre-email" placeholder="nom@entreprise.sn"></div>
+      <div class="field"><label>Rôle</label>
+        <select id="membre-role">
+          <option value="membre" selected>Membre</option>
+          <option value="coordinateur">Coordinateur</option>
+        </select>
+      </div>
+      <div class="hint">Le membre recevra un e-mail avec un lien pour définir son mot de passe et accéder à l'application.</div>
+    </div><div class="modal-foot"><button class="btn btn-outline" id="membreCancel">Annuler</button><button class="btn btn-primary" id="membreSave">${icon('mail')} Envoyer l'invitation</button></div></div>`;
+    document.body.appendChild(overlay);
+    const close=()=>overlay.remove();
+    overlay.querySelector('#membreClose').onclick=close;
+    overlay.querySelector('#membreCancel').onclick=close;
+    overlay.querySelector('#membreSave').onclick=async()=>{
+      const name=overlay.querySelector('#membre-name').value.trim();
+      const email=overlay.querySelector('#membre-email').value.trim();
+      const fonction=overlay.querySelector('#membre-fonction').value.trim();
+      const role=overlay.querySelector('#membre-role').value;
+      if(!name || !email){ toast('Le nom et l’e-mail sont obligatoires.'); return; }
+      if(!/^\S+@\S+\.\S+$/.test(email)){ toast('Veuillez saisir une adresse e-mail valide.'); return; }
+      const saveBtn=overlay.querySelector('#membreSave');
+      saveBtn.disabled=true; saveBtn.textContent='Envoi…';
+      try{
+        const {data:{session}} = await sb.auth.getSession();
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/invite-member`,{
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json',
+            'Authorization':`Bearer ${session.access_token}`,
+            'apikey':SUPABASE_ANON_KEY,
+          },
+          body:JSON.stringify({name,email,fonction,role}),
+        });
+        const json=await res.json();
+        if(!res.ok){ toast(json.error||"Impossible d'envoyer l'invitation."); saveBtn.disabled=false; saveBtn.textContent="Envoyer l'invitation"; return; }
+        toast(`Invitation envoyée à ${email}.`,'mail');
+        close();
+        await loadProfiles();
+        render();
+      }catch(e){
+        console.error(e);
+        toast("Impossible de contacter le serveur d'invitation.");
+        saveBtn.disabled=false; saveBtn.textContent="Envoyer l'invitation";
+      }
+    };
+  };
+}
+
+/* ======================================================================
    VIEW: NEW REPORT — pre-formatted template
    ====================================================================== */
 function viewNewReport(){
@@ -1820,6 +1920,7 @@ function renderContent(){
   else if(state.view==='new-report') c.innerHTML=viewNewReport();
   else if(state.view==='tasks') c.innerHTML=viewTasks();
   else if(state.view==='responsables') c.innerHTML=viewResponsables();
+  else if(state.view==='membres'){ c.innerHTML=viewMembres(); wireMembres(); }
 
   // wire generic data-attributes
   c.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>setView(b.dataset.nav));
@@ -1895,16 +1996,99 @@ function render(){
   renderContent();
 }
 
-(async function init(){
-  if(sb){
-    try{
-      await loadFromSupabase();
-    }catch(e){
-      console.error(e);
-      toast("Connexion à Supabase impossible, mode démo (local) utilisé.");
-    }
+/* ======================================================================
+   AUTHENTIFICATION — écran de connexion / activation de compte
+   ====================================================================== */
+function renderAuthScreen(mode, errorMsg=''){
+  document.getElementById('shell').style.display='none';
+  const el=document.getElementById('authScreen');
+  el.style.display='flex';
+  const isSetPw = mode==='set-password';
+  el.innerHTML = `
+    <div style="min-height:100vh;width:100%;display:flex;align-items:center;justify-content:center;background:var(--bg);font-family:var(--font-body);">
+      <div style="width:360px;max-width:92vw;background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:var(--shadow-card);padding:32px;">
+        <div style="font-family:var(--font-display);font-weight:800;font-size:19px;color:var(--ink-900);margin-bottom:2px;">TERRAIN SUITE</div>
+        <div style="font-size:12.5px;color:var(--ink-400);margin-bottom:24px;">${isSetPw?'Définissez votre mot de passe pour activer votre compte':'Comptes rendus de mission'}</div>
+        ${isSetPw ? `
+          <div class="field"><label>Nouveau mot de passe</label><input id="authPw1" type="password" placeholder="8 caractères minimum" autofocus></div>
+          <div class="field"><label>Confirmez le mot de passe</label><input id="authPw2" type="password" placeholder="Retapez le mot de passe"></div>
+          <button class="btn btn-primary" id="authSubmit" style="width:100%;justify-content:center;margin-top:6px;">${icon('check')} Activer mon compte</button>
+        ` : `
+          <div class="field"><label>E-mail</label><input id="authEmail" type="email" placeholder="vous@entreprise.sn" autofocus></div>
+          <div class="field"><label>Mot de passe</label><input id="authPw" type="password" placeholder="••••••••"></div>
+          <button class="btn btn-primary" id="authSubmit" style="width:100%;justify-content:center;margin-top:6px;">Se connecter</button>
+        `}
+        <div id="authError" style="color:var(--red-600);font-size:12.5px;margin-top:12px;">${errorMsg||''}</div>
+      </div>
+    </div>`;
+  const submit = isSetPw ? submitSetPassword : submitLogin;
+  document.getElementById('authSubmit').onclick = submit;
+  el.querySelectorAll('input').forEach(inp=>inp.addEventListener('keydown',e=>{if(e.key==='Enter') submit();}));
+}
+
+async function submitLogin(){
+  const email=document.getElementById('authEmail').value.trim();
+  const pw=document.getElementById('authPw').value;
+  const errEl=document.getElementById('authError');
+  errEl.textContent='';
+  if(!email || !pw){ errEl.textContent='Renseignez votre e-mail et votre mot de passe.'; return; }
+  const {error}=await sb.auth.signInWithPassword({email,password:pw});
+  if(error){ errEl.textContent='E-mail ou mot de passe incorrect.'; return; }
+  // La suite est gérée par onAuthStateChange.
+}
+
+async function submitSetPassword(){
+  const pw1=document.getElementById('authPw1').value;
+  const pw2=document.getElementById('authPw2').value;
+  const errEl=document.getElementById('authError');
+  errEl.textContent='';
+  if(pw1.length<8){ errEl.textContent='8 caractères minimum.'; return; }
+  if(pw1!==pw2){ errEl.textContent='Les mots de passe ne correspondent pas.'; return; }
+  const {error}=await sb.auth.updateUser({password:pw1});
+  if(error){ errEl.textContent=error.message; return; }
+  pendingPasswordSetup=false;
+  toast('Compte activé, bienvenue !');
+  await startApp();
+}
+
+async function logout(){
+  await sb.auth.signOut();
+}
+
+async function startApp(){
+  try{
+    await loadProfiles();
+    await loadFromSupabase();
+  }catch(e){
+    console.error(e);
+    toast("Connexion à Supabase impossible.");
   }
+  document.getElementById('authScreen').style.display='none';
+  document.getElementById('shell').style.display='flex';
   render();
+}
+
+(function init(){
+  if(!sb){
+    renderAuthScreen('login', "Supabase n'est pas configuré : vérifiez SUPABASE_URL et SUPABASE_ANON_KEY en haut du fichier.");
+    return;
+  }
+  if(initialAuthHash.includes('type=invite') || initialAuthHash.includes('type=recovery')){
+    pendingPasswordSetup=true;
+  }
+  sb.auth.onAuthStateChange((event,session)=>{
+    if(!session){
+      state.currentUserId=null;
+      renderAuthScreen('login');
+      return;
+    }
+    state.currentUserId=session.user.id;
+    if(pendingPasswordSetup){
+      renderAuthScreen('set-password');
+    }else{
+      startApp();
+    }
+  });
 })();
 </script>
 </body>
