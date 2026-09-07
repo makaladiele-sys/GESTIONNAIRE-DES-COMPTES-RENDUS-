@@ -1920,7 +1920,7 @@ function renderContent(){
   else if(state.view==='report-detail') c.innerHTML=viewReportDetail();
   else if(state.view==='new-report') c.innerHTML=viewNewReport();
   else if(state.view==='tasks') c.innerHTML=viewTasks();
-  else if(state.view==='responsables') c.innerHTML=viewResponsables();
+  else if(state.view==='responsables'){ c.innerHTML=viewResponsables(); wireResponsables(); }
   else if(state.view==='membres'){ c.innerHTML=viewMembres(); wireMembres(); }
 
   // wire generic data-attributes
