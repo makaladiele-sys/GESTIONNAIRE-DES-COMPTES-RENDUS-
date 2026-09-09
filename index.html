@@ -1771,14 +1771,14 @@ function viewMembres(){
     <div class="page-head">
       <div>
         <h1>Membres du bureau</h1>
-        <div class="sub">Ajoutez un membre : il recevra un e-mail avec un lien pour créer son mot de passe et activer son compte.</div>
+        <div class="sub">Ajoutez, modifiez ou supprimez les comptes des membres du bureau.</div>
       </div>
       <button class="btn btn-primary" id="addMembreBtn">${icon('plus')} Ajouter un membre</button>
     </div>
     <div class="card card-pad">
       ${DB.users.length ? `
         <table class="tasks-table">
-          <thead><tr><th>Membre</th><th>Fonction</th><th>E-mail</th><th>Rôle</th></tr></thead>
+          <thead><tr><th>Membre</th><th>Fonction</th><th>E-mail</th><th>Rôle</th><th style="width:96px">Actions</th></tr></thead>
           <tbody>
             ${DB.users.map(m=>`
               <tr>
@@ -1786,6 +1786,10 @@ function viewMembres(){
                 <td>${m.fonction||'—'}</td>
                 <td>${m.email||'—'}</td>
                 <td><span class="badge ${m.role==='coordinateur'?'badge-green':'badge-gray'}">${m.role==='coordinateur'?'Coordinateur':'Membre'}</span></td>
+                <td><div class="row-actions">
+                  <button class="icon-btn icon-btn-sm" data-edit-membre="${m.id}" title="Modifier">${icon('edit','icon-sm')}</button>
+                  ${m.id!==u.id?`<button class="icon-btn icon-btn-sm danger" data-del-membre="${m.id}" title="Supprimer">${icon('trash','icon-sm')}</button>`:''}
+                </div></td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -1796,59 +1800,115 @@ function viewMembres(){
 function wireMembres(){
   const u=currentUser();
   if(u.role!=='coordinateur') return;
-  const addBtn=document.getElementById('addMembreBtn');
-  if(!addBtn) return;
-  addBtn.onclick=()=>{
+
+  const openMemberForm=(member=null)=>{
+    const isEdit=!!member;
     const overlay=document.createElement('div'); overlay.className='modal-overlay';
-    overlay.innerHTML=`<div class="modal-card"><div class="modal-head"><h3>Ajouter un membre</h3><button class="icon-btn" id="membreClose">${icon('x','icon-sm')}</button></div><div class="modal-body">
-      <div class="field"><label>Nom complet <span style="color:var(--red-600)">*</span></label><input type="text" id="membre-name" placeholder="Ex : Fatou Sarr" autofocus></div>
-      <div class="field"><label>Fonction</label><input type="text" id="membre-fonction" placeholder="Ex : Animatrice terrain"></div>
-      <div class="field"><label>E-mail <span style="color:var(--red-600)">*</span></label><input type="email" id="membre-email" placeholder="nom@entreprise.sn"></div>
+    overlay.innerHTML=`<div class="modal-card"><div class="modal-head"><h3>${isEdit?'Modifier le membre':'Ajouter un membre'}</h3><button class="icon-btn" id="membreClose">${icon('x','icon-sm')}</button></div><div class="modal-body">
+      <div class="field"><label>Nom complet <span style="color:var(--red-600)">*</span></label><input type="text" id="membre-name" value="${(member?.name||'').replace(/"/g,'&quot;')}" placeholder="Ex : Fatou Sarr" autofocus></div>
+      <div class="field"><label>Fonction</label><input type="text" id="membre-fonction" value="${(member?.fonction||'').replace(/"/g,'&quot;')}" placeholder="Ex : Animatrice terrain"></div>
+      ${isEdit ? `
+      <div class="field"><label>E-mail</label><input type="email" value="${(member.email||'').replace(/"/g,'&quot;')}" disabled style="background:var(--line-soft);color:var(--ink-400);"></div>
+      <div class="hint">L'e-mail ne peut pas être modifié ici. Supprimez le membre puis ré-invitez-le si l'adresse doit changer.</div>
+      ` : `<div class="field"><label>E-mail <span style="color:var(--red-600)">*</span></label><input type="email" id="membre-email" placeholder="nom@entreprise.sn"></div>`}
       <div class="field"><label>Rôle</label>
         <select id="membre-role">
-          <option value="membre" selected>Membre</option>
-          <option value="coordinateur">Coordinateur</option>
+          <option value="membre" ${!member || member.role!=='coordinateur'?'selected':''}>Membre</option>
+          <option value="coordinateur" ${member && member.role==='coordinateur'?'selected':''}>Coordinateur</option>
         </select>
       </div>
-      <div class="hint">Le membre recevra un e-mail avec un lien pour définir son mot de passe et accéder à l'application.</div>
-    </div><div class="modal-foot"><button class="btn btn-outline" id="membreCancel">Annuler</button><button class="btn btn-primary" id="membreSave">${icon('mail')} Envoyer l'invitation</button></div></div>`;
+      ${!isEdit? `<div class="hint">Le membre recevra un e-mail avec un lien pour définir son mot de passe et accéder à l'application.</div>`:''}
+    </div><div class="modal-foot"><button class="btn btn-outline" id="membreCancel">Annuler</button><button class="btn btn-primary" id="membreSave">${isEdit?icon('check'):icon('mail')} ${isEdit?'Enregistrer les modifications':"Envoyer l'invitation"}</button></div></div>`;
     document.body.appendChild(overlay);
     const close=()=>overlay.remove();
     overlay.querySelector('#membreClose').onclick=close;
     overlay.querySelector('#membreCancel').onclick=close;
     overlay.querySelector('#membreSave').onclick=async()=>{
       const name=overlay.querySelector('#membre-name').value.trim();
-      const email=overlay.querySelector('#membre-email').value.trim();
       const fonction=overlay.querySelector('#membre-fonction').value.trim();
       const role=overlay.querySelector('#membre-role').value;
-      if(!name || !email){ toast('Le nom et l’e-mail sont obligatoires.'); return; }
-      if(!/^\S+@\S+\.\S+$/.test(email)){ toast('Veuillez saisir une adresse e-mail valide.'); return; }
+      if(!name){ toast('Le nom est obligatoire.'); return; }
       const saveBtn=overlay.querySelector('#membreSave');
-      saveBtn.disabled=true; saveBtn.textContent='Envoi…';
+      saveBtn.disabled=true;
       try{
         const {data:{session}} = await sb.auth.getSession();
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/invite-member`,{
-          method:'POST',
-          headers:{
-            'Content-Type':'application/json',
-            'Authorization':`Bearer ${session.access_token}`,
-            'apikey':SUPABASE_ANON_KEY,
-          },
-          body:JSON.stringify({name,email,fonction,role}),
-        });
-        const json=await res.json();
-        if(!res.ok){ toast(json.error||"Impossible d'envoyer l'invitation."); saveBtn.disabled=false; saveBtn.textContent="Envoyer l'invitation"; return; }
-        toast(`Invitation envoyée à ${email}.`,'mail');
+        if(isEdit){
+          saveBtn.textContent='Enregistrement…';
+          const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-member`,{
+            method:'POST',
+            headers:{
+              'Content-Type':'application/json',
+              'Authorization':`Bearer ${session.access_token}`,
+              'apikey':SUPABASE_ANON_KEY,
+            },
+            body:JSON.stringify({action:'update',userId:member.id,name,fonction,role}),
+          });
+          const json=await res.json();
+          if(!res.ok){ toast(json.error||"Impossible d'enregistrer les modifications."); saveBtn.disabled=false; saveBtn.textContent='Enregistrer les modifications'; return; }
+          toast('Membre modifié.');
+        }else{
+          const email=overlay.querySelector('#membre-email').value.trim();
+          if(!email){ toast('L’e-mail est obligatoire.'); saveBtn.disabled=false; return; }
+          if(!/^\S+@\S+\.\S+$/.test(email)){ toast('Veuillez saisir une adresse e-mail valide.'); saveBtn.disabled=false; return; }
+          saveBtn.textContent='Envoi…';
+          const res = await fetch(`${SUPABASE_URL}/functions/v1/invite-member`,{
+            method:'POST',
+            headers:{
+              'Content-Type':'application/json',
+              'Authorization':`Bearer ${session.access_token}`,
+              'apikey':SUPABASE_ANON_KEY,
+            },
+            body:JSON.stringify({name,email,fonction,role}),
+          });
+          const json=await res.json();
+          if(!res.ok){ toast(json.error||"Impossible d'envoyer l'invitation."); saveBtn.disabled=false; saveBtn.textContent="Envoyer l'invitation"; return; }
+          toast(`Invitation envoyée à ${email}.`,'mail');
+        }
         close();
         await loadProfiles();
         render();
       }catch(e){
         console.error(e);
-        toast("Impossible de contacter le serveur d'invitation.");
-        saveBtn.disabled=false; saveBtn.textContent="Envoyer l'invitation";
+        toast("Impossible de contacter le serveur.");
+        saveBtn.disabled=false;
+        saveBtn.textContent=isEdit?'Enregistrer les modifications':"Envoyer l'invitation";
       }
     };
   };
+
+  const addBtn=document.getElementById('addMembreBtn');
+  if(addBtn) addBtn.onclick=()=>openMemberForm();
+
+  document.querySelectorAll('[data-edit-membre]').forEach(b=>b.onclick=()=>{
+    const m=DB.users.find(x=>x.id===b.dataset.editMembre);
+    if(m) openMemberForm(m);
+  });
+
+  document.querySelectorAll('[data-del-membre]').forEach(b=>b.onclick=async()=>{
+    const m=DB.users.find(x=>x.id===b.dataset.delMembre);
+    if(!m) return;
+    if(!confirm(`Supprimer définitivement le compte de ${m.name} ? Cette action est irréversible.`)) return;
+    try{
+      const {data:{session}} = await sb.auth.getSession();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-member`,{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization':`Bearer ${session.access_token}`,
+          'apikey':SUPABASE_ANON_KEY,
+        },
+        body:JSON.stringify({action:'delete',userId:m.id}),
+      });
+      const json=await res.json();
+      if(!res.ok){ toast(json.error||"Impossible de supprimer ce membre."); return; }
+      toast('Membre supprimé.');
+      await loadProfiles();
+      render();
+    }catch(e){
+      console.error(e);
+      toast("Impossible de contacter le serveur.");
+    }
+  });
 }
 
 /* ======================================================================
