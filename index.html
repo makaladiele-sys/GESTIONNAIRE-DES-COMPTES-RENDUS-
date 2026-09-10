@@ -405,7 +405,15 @@ table.results tr:last-child td{border-bottom:none;}
   width:32px;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--card);
   display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--red-600);
 }
+.dyn-row{align-items:flex-start;}
+.dyn-row .rm-btn{margin-top:2px;}
 .dyn-row .rm-btn svg{stroke:var(--red-600);}
+.dyn-row textarea{
+  flex:1;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:13.5px;
+  color:var(--ink-900);outline:none;background:var(--card);
+  line-height:1.5;min-height:40px;font-family:var(--font-body);resize:none;overflow:hidden;
+}
+.dyn-row textarea:focus{border-color:var(--blue-500);}
 .add-link{
   display:inline-flex;align-items:center;gap:7px;font-size:12.8px;font-weight:600;color:var(--blue-700);
   background:var(--blue-50);padding:8px 13px;border-radius:8px;border:1px dashed var(--blue-100);
@@ -1523,56 +1531,154 @@ const STATUS_CLASS={a_faire:'badge-gray',en_cours:'badge-blue',termine:'badge-gr
 const PRIORITY_COLOR={haute:'#C82A2B',moyenne:'#F2C500',basse:'#8B94A3'};
 
 function viewTasks(){
+
   const list=[...DB.tasks].sort((a,b)=>new Date(a.dueDate)-new Date(b.dueDate));
+
   return `
+
     <div class="page-head">
+
       <div>
+
         <h1>Tâches &amp; missions</h1>
+
         <div class="sub">${DB.tasks.length} tâche${DB.tasks.length>1?'s':''} de terrain planifiée${DB.tasks.length>1?'s':''}.</div>
+
       </div>
+
       <button class="btn btn-primary" id="addTaskBtn">${icon('plus')} Nouvelle tâche</button>
+
     </div>
+
     <div class="card">
+
       ${list.length? `
+
       <table class="tasks-table">
+
         <thead><tr>
-          <th>Tâche / Mission</th><th>Projet</th><th>Lieu</th><th>Assigné à</th><th>Échéance</th><th>Priorité</th><th>Statut</th><th></th>
+
+          <th>Tâche / Mission</th>
+          <th>Projet</th>
+          <th>Lieu</th>
+          <th>Assigné à</th>
+          <th>Échéance</th>
+          <th>Priorité</th>
+          <th>Statut</th>
+          <th></th>
+
         </tr></thead>
+
         <tbody>
+
           ${list.map(t=>{
+
             const a=userById(t.assignedTo);
+
+            // Sécurité : le responsable peut ne plus exister dans DB.users
+            const assignee = a || {
+              id:'',
+              name:'Responsable introuvable'
+            };
+
             return `<tr>
+
               <td style="font-weight:600;color:var(--ink-900)">${t.title}</td>
+
               <td>${t.project}</td>
+
               <td>${t.location}</td>
-              <td><div class="assignee"><div class="mini-av" style="background:${colorFor(a.id)}">${initials(a.name)}</div>${a.name}</div></td>
-              <td>${fmtDateShort(t.dueDate)}</td>
-              <td><span class="priority-dot" style="background:${PRIORITY_COLOR[t.priority]}"></span>${t.priority.charAt(0).toUpperCase()+t.priority.slice(1)}</td>
+
               <td>
-                <select class="status-select ${STATUS_CLASS[t.status]}" data-status-task="${t.id}">
-                  ${Object.keys(STATUS_LABEL).map(s=>`<option value="${s}" ${s===t.status?'selected':''}>${STATUS_LABEL[s]}</option>`).join('')}
-                </select>
-              </td>
-              <td>
-                <div class="row-actions">
-                  <button class="icon-btn icon-btn-sm" data-edit-task="${t.id}" title="Modifier">${icon('edit','icon-sm')}</button>
-                  <button class="icon-btn icon-btn-sm danger" data-del-task="${t.id}" title="Supprimer">${icon('trash','icon-sm')}</button>
+                <div class="assignee">
+                  <div
+                    class="mini-av"
+                    style="background:${assignee.id ? colorFor(assignee.id) : '#8B94A3'}"
+                  >
+                    ${assignee.id ? initials(assignee.name) : '?'}
+                  </div>
+                  ${assignee.name}
                 </div>
               </td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>` : `
-      <div class="empty-state">
-        ${icon('tasks','icon')}
-        <div class="t">Aucune tâche pour le moment</div>
-        <div class="d">Créez votre première tâche ou mission de terrain.</div>
-      </div>`}
-    </div>
-    <div id="modalRoot"></div>
-  `;
-}
 
+              <td>${fmtDateShort(t.dueDate)}</td>
+
+              <td>
+                <span
+                  class="priority-dot"
+                  style="background:${PRIORITY_COLOR[t.priority]}"
+                ></span>
+                ${t.priority.charAt(0).toUpperCase()+t.priority.slice(1)}
+              </td>
+
+              <td>
+
+                <select
+                  class="status-select ${STATUS_CLASS[t.status]}"
+                  data-status-task="${t.id}"
+                >
+
+                  ${Object.keys(STATUS_LABEL).map(s=>`
+                    <option value="${s}" ${s===t.status?'selected':''}>
+                      ${STATUS_LABEL[s]}
+                    </option>
+                  `).join('')}
+
+                </select>
+
+              </td>
+
+              <td>
+
+                <div class="row-actions">
+
+                  <button
+                    class="icon-btn icon-btn-sm"
+                    data-edit-task="${t.id}"
+                    title="Modifier"
+                  >
+                    ${icon('edit','icon-sm')}
+                  </button>
+
+                  <button
+                    class="icon-btn icon-btn-sm danger"
+                    data-del-task="${t.id}"
+                    title="Supprimer"
+                  >
+                    ${icon('trash','icon-sm')}
+                  </button>
+
+                </div>
+
+              </td>
+
+            </tr>`;
+
+          }).join('')}
+
+        </tbody>
+
+      </table>`
+
+      : `
+
+      <div class="empty-state">
+
+        ${icon('tasks','icon')}
+
+        <div class="t">Aucune tâche pour le moment</div>
+
+        <div class="d">Créez A première tâche ou mission de terrain.</div>
+
+      </div>`}
+
+    </div>
+
+    <div id="modalRoot"></div>
+
+  `;
+
+}
 /* ---- Task modal (create / edit) ---- */
 function openTaskModal(task=null){
   const isEdit=!!task;
@@ -2030,17 +2136,8 @@ function viewNewReport(){
 }
 
 /* ---- dynamic list helpers for the new-report form ---- */
-function makeDynRow(container,placeholder,value=''){
-  const row=document.createElement('div');
-  row.className='dyn-row';
-  row.innerHTML=`<input type="text" placeholder="${placeholder}" value="${value.replace(/"/g,'&quot;')}"><button type="button" class="rm-btn">${icon('trash','icon-sm')}</button>`;
-  row.querySelector('.rm-btn').onclick=()=>{ if(container.children.length>1) row.remove(); else row.querySelector('input').value=''; };
-  container.appendChild(row);
-}
-function getDynValues(container){
-  return [...container.querySelectorAll('input')].map(i=>i.value.trim()).filter(Boolean);
-}
-let photoStore=[]; // [{url(dataURL), caption}]
+function makeDynRow(container,placeholder,value=''){ const row=document.createElement('div'); row.className='dyn-row'; row.innerHTML=`<input type="text" placeholder="${placeholder}" value="${value.replace(/"/g,'&quot;')}"><button type="button" class="rm-btn">${icon('trash','icon-sm')}</button>`; row.querySelector('.rm-btn').onclick=()=>{ if(container.children.length>1) row.remove(); else row.querySelector('input').value=''; }; container.appendChild(row); }
+function getDynValues(container){ return [...container.querySelectorAll('textarea')].map(i=>i.value.trim()).filter(Boolean); }let photoStore=[]; // [{url(dataURL), caption}]
 function renderPhotoThumbs(){
   const wrap=document.getElementById('photoThumbs');
   wrap.innerHTML=photoStore.map((p,i)=>`
@@ -2382,30 +2479,17 @@ async function startApp(){
     pendingPasswordSetup=true;
   }
   sb.auth.onAuthStateChange((event,session)=>{
-    // Le jeton de connexion est renouvelé automatiquement par Supabase en
-    // arrière-plan (toutes les heures environ, ou au retour sur l'onglet).
-    // Cet événement ne doit JAMAIS recharger l'application : ça effacerait
-    // sans prévenir tout ce que la personne est en train de saisir dans un
-    // formulaire. On ne réagit qu'aux vrais changements de connexion.
-    if(event==='TOKEN_REFRESHED') return;
-
     if(!session){
       state.currentUserId=null;
       renderAuthScreen('login');
       return;
     }
-
-    const appAlreadyVisible = document.getElementById('shell').style.display!=='none';
-    const sameUserAlreadyLoaded = state.currentUserId===session.user.id;
     state.currentUserId=session.user.id;
-
     if(pendingPasswordSetup){
       renderAuthScreen('set-password');
-    }else if(!(appAlreadyVisible && sameUserAlreadyLoaded)){
+    }else{
       startApp();
     }
-    // Sinon : l'application est déjà affichée pour cette même personne,
-    // on ne touche à rien pour ne pas perdre une saisie en cours.
   });
 })();
 </script>
