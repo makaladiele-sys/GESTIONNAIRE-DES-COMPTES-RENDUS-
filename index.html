@@ -6,8 +6,8 @@
 <link rel="icon" href="data:,">
 <title>Terrain — Comptes rendus de visite</title>
 <link rel="preconnect" href="https://fonts.googleapis.com/">
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="Terrain%20%E2%80%94%20Comptes%20rendus%20de%20visite_files/css2_I4qC.css" rel="stylesheet">
+<script src="Terrain%20%E2%80%94%20Comptes%20rendus%20de%20visite_files/supabase-js@2_I4qC"></script>
 <style>
 /* ============ TOKENS ============ */
 :root{
@@ -772,10 +772,10 @@ function icon(name,cls='icon',stroke='currentColor'){
    ====================================================================== */
 const SUPABASE_URL = 'https://xnudovkpzolgpkmgzxfr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhudWRvdmtwem9sZ3BrbWd6eGZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3MjI4ODIsImV4cCI6MjEwNDI5ODg4Mn0.Uk9on4jovU-p6rKq_7D7CDrUfcDDNjmJH-oFXOg5nNc';
-const credentialsConfigured = SUPABASE_URL.includes('supabase.co')
+const supabaseReady = typeof window.supabase !== 'undefined'
+  && SUPABASE_URL.includes('supabase.co')
   && !SUPABASE_URL.includes('VOTRE-PROJET')
   && SUPABASE_ANON_KEY !== 'VOTRE-CLE-ANON-PUBLIC';
-const supabaseReady = typeof window.supabase !== 'undefined' && credentialsConfigured;
 const sb = supabaseReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 /* --- mapping JS (camelCase) <-> colonnes Supabase (snake_case) --- */
@@ -1028,13 +1028,9 @@ function currentUser(){return userById(state.currentUserId);}
 
 function setView(view,params={}){
   state.view=view;
-  if(view==='new-report' && !('editingReportId' in params)) state.editingReportId=null;
   Object.assign(state,params);
   window.scrollTo(0,0);
   render();
-}
-function getEditingReport(){
-  return state.editingReportId ? DB.reports.find(r=>r.id===state.editingReportId) : null;
 }
 
 function toast(msg,type='ok'){
@@ -1771,14 +1767,14 @@ function viewMembres(){
     <div class="page-head">
       <div>
         <h1>Membres du bureau</h1>
-        <div class="sub">Ajoutez, modifiez ou supprimez les comptes des membres du bureau.</div>
+        <div class="sub">Ajoutez un membre : il recevra un e-mail avec un lien pour créer son mot de passe et activer son compte.</div>
       </div>
       <button class="btn btn-primary" id="addMembreBtn">${icon('plus')} Ajouter un membre</button>
     </div>
     <div class="card card-pad">
       ${DB.users.length ? `
         <table class="tasks-table">
-          <thead><tr><th>Membre</th><th>Fonction</th><th>E-mail</th><th>Rôle</th><th style="width:96px">Actions</th></tr></thead>
+          <thead><tr><th>Membre</th><th>Fonction</th><th>E-mail</th><th>Rôle</th></tr></thead>
           <tbody>
             ${DB.users.map(m=>`
               <tr>
@@ -1786,10 +1782,6 @@ function viewMembres(){
                 <td>${m.fonction||'—'}</td>
                 <td>${m.email||'—'}</td>
                 <td><span class="badge ${m.role==='coordinateur'?'badge-green':'badge-gray'}">${m.role==='coordinateur'?'Coordinateur':'Membre'}</span></td>
-                <td><div class="row-actions">
-                  <button class="icon-btn icon-btn-sm" data-edit-membre="${m.id}" title="Modifier">${icon('edit','icon-sm')}</button>
-                  ${m.id!==u.id?`<button class="icon-btn icon-btn-sm danger" data-del-membre="${m.id}" title="Supprimer">${icon('trash','icon-sm')}</button>`:''}
-                </div></td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -1800,127 +1792,70 @@ function viewMembres(){
 function wireMembres(){
   const u=currentUser();
   if(u.role!=='coordinateur') return;
-
-  const openMemberForm=(member=null)=>{
-    const isEdit=!!member;
+  const addBtn=document.getElementById('addMembreBtn');
+  if(!addBtn) return;
+  addBtn.onclick=()=>{
     const overlay=document.createElement('div'); overlay.className='modal-overlay';
-    overlay.innerHTML=`<div class="modal-card"><div class="modal-head"><h3>${isEdit?'Modifier le membre':'Ajouter un membre'}</h3><button class="icon-btn" id="membreClose">${icon('x','icon-sm')}</button></div><div class="modal-body">
-      <div class="field"><label>Nom complet <span style="color:var(--red-600)">*</span></label><input type="text" id="membre-name" value="${(member?.name||'').replace(/"/g,'&quot;')}" placeholder="Ex : Fatou Sarr" autofocus></div>
-      <div class="field"><label>Fonction</label><input type="text" id="membre-fonction" value="${(member?.fonction||'').replace(/"/g,'&quot;')}" placeholder="Ex : Animatrice terrain"></div>
-      ${isEdit ? `
-      <div class="field"><label>E-mail</label><input type="email" value="${(member.email||'').replace(/"/g,'&quot;')}" disabled style="background:var(--line-soft);color:var(--ink-400);"></div>
-      <div class="hint">L'e-mail ne peut pas être modifié ici. Supprimez le membre puis ré-invitez-le si l'adresse doit changer.</div>
-      ` : `<div class="field"><label>E-mail <span style="color:var(--red-600)">*</span></label><input type="email" id="membre-email" placeholder="nom@entreprise.sn"></div>`}
+    overlay.innerHTML=`<div class="modal-card"><div class="modal-head"><h3>Ajouter un membre</h3><button class="icon-btn" id="membreClose">${icon('x','icon-sm')}</button></div><div class="modal-body">
+      <div class="field"><label>Nom complet <span style="color:var(--red-600)">*</span></label><input type="text" id="membre-name" placeholder="Ex : Fatou Sarr" autofocus></div>
+      <div class="field"><label>Fonction</label><input type="text" id="membre-fonction" placeholder="Ex : Animatrice terrain"></div>
+      <div class="field"><label>E-mail <span style="color:var(--red-600)">*</span></label><input type="email" id="membre-email" placeholder="nom@entreprise.sn"></div>
       <div class="field"><label>Rôle</label>
         <select id="membre-role">
-          <option value="membre" ${!member || member.role!=='coordinateur'?'selected':''}>Membre</option>
-          <option value="coordinateur" ${member && member.role==='coordinateur'?'selected':''}>Coordinateur</option>
+          <option value="membre" selected>Membre</option>
+          <option value="coordinateur">Coordinateur</option>
         </select>
       </div>
-      ${!isEdit? `<div class="hint">Le membre recevra un e-mail avec un lien pour définir son mot de passe et accéder à l'application.</div>`:''}
-    </div><div class="modal-foot"><button class="btn btn-outline" id="membreCancel">Annuler</button><button class="btn btn-primary" id="membreSave">${isEdit?icon('check'):icon('mail')} ${isEdit?'Enregistrer les modifications':"Envoyer l'invitation"}</button></div></div>`;
+      <div class="hint">Le membre recevra un e-mail avec un lien pour définir son mot de passe et accéder à l'application.</div>
+    </div><div class="modal-foot"><button class="btn btn-outline" id="membreCancel">Annuler</button><button class="btn btn-primary" id="membreSave">${icon('mail')} Envoyer l'invitation</button></div></div>`;
     document.body.appendChild(overlay);
     const close=()=>overlay.remove();
     overlay.querySelector('#membreClose').onclick=close;
     overlay.querySelector('#membreCancel').onclick=close;
     overlay.querySelector('#membreSave').onclick=async()=>{
       const name=overlay.querySelector('#membre-name').value.trim();
+      const email=overlay.querySelector('#membre-email').value.trim();
       const fonction=overlay.querySelector('#membre-fonction').value.trim();
       const role=overlay.querySelector('#membre-role').value;
-      if(!name){ toast('Le nom est obligatoire.'); return; }
+      if(!name || !email){ toast('Le nom et l’e-mail sont obligatoires.'); return; }
+      if(!/^\S+@\S+\.\S+$/.test(email)){ toast('Veuillez saisir une adresse e-mail valide.'); return; }
       const saveBtn=overlay.querySelector('#membreSave');
-      saveBtn.disabled=true;
+      saveBtn.disabled=true; saveBtn.textContent='Envoi…';
       try{
         const {data:{session}} = await sb.auth.getSession();
-        if(isEdit){
-          saveBtn.textContent='Enregistrement…';
-          const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-member`,{
-            method:'POST',
-            headers:{
-              'Content-Type':'application/json',
-              'Authorization':`Bearer ${session.access_token}`,
-              'apikey':SUPABASE_ANON_KEY,
-            },
-            body:JSON.stringify({action:'update',userId:member.id,name,fonction,role}),
-          });
-          const json=await res.json();
-          if(!res.ok){ toast(json.error||"Impossible d'enregistrer les modifications."); saveBtn.disabled=false; saveBtn.textContent='Enregistrer les modifications'; return; }
-          toast('Membre modifié.');
-        }else{
-          const email=overlay.querySelector('#membre-email').value.trim();
-          if(!email){ toast('L’e-mail est obligatoire.'); saveBtn.disabled=false; return; }
-          if(!/^\S+@\S+\.\S+$/.test(email)){ toast('Veuillez saisir une adresse e-mail valide.'); saveBtn.disabled=false; return; }
-          saveBtn.textContent='Envoi…';
-          const res = await fetch(`${SUPABASE_URL}/functions/v1/invite-member`,{
-            method:'POST',
-            headers:{
-              'Content-Type':'application/json',
-              'Authorization':`Bearer ${session.access_token}`,
-              'apikey':SUPABASE_ANON_KEY,
-            },
-            body:JSON.stringify({name,email,fonction,role}),
-          });
-          const json=await res.json();
-          if(!res.ok){ toast(json.error||"Impossible d'envoyer l'invitation."); saveBtn.disabled=false; saveBtn.textContent="Envoyer l'invitation"; return; }
-          toast(`Invitation envoyée à ${email}.`,'mail');
-        }
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/invite-member`,{
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json',
+            'Authorization':`Bearer ${session.access_token}`,
+            'apikey':SUPABASE_ANON_KEY,
+          },
+          body:JSON.stringify({name,email,fonction,role}),
+        });
+        const json=await res.json();
+        if(!res.ok){ toast(json.error||"Impossible d'envoyer l'invitation."); saveBtn.disabled=false; saveBtn.textContent="Envoyer l'invitation"; return; }
+        toast(`Invitation envoyée à ${email}.`,'mail');
         close();
         await loadProfiles();
         render();
       }catch(e){
         console.error(e);
-        toast("Impossible de contacter le serveur.");
-        saveBtn.disabled=false;
-        saveBtn.textContent=isEdit?'Enregistrer les modifications':"Envoyer l'invitation";
+        toast("Impossible de contacter le serveur d'invitation.");
+        saveBtn.disabled=false; saveBtn.textContent="Envoyer l'invitation";
       }
     };
   };
-
-  const addBtn=document.getElementById('addMembreBtn');
-  if(addBtn) addBtn.onclick=()=>openMemberForm();
-
-  document.querySelectorAll('[data-edit-membre]').forEach(b=>b.onclick=()=>{
-    const m=DB.users.find(x=>x.id===b.dataset.editMembre);
-    if(m) openMemberForm(m);
-  });
-
-  document.querySelectorAll('[data-del-membre]').forEach(b=>b.onclick=async()=>{
-    const m=DB.users.find(x=>x.id===b.dataset.delMembre);
-    if(!m) return;
-    if(!confirm(`Supprimer définitivement le compte de ${m.name} ? Cette action est irréversible.`)) return;
-    try{
-      const {data:{session}} = await sb.auth.getSession();
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-member`,{
-        method:'POST',
-        headers:{
-          'Content-Type':'application/json',
-          'Authorization':`Bearer ${session.access_token}`,
-          'apikey':SUPABASE_ANON_KEY,
-        },
-        body:JSON.stringify({action:'delete',userId:m.id}),
-      });
-      const json=await res.json();
-      if(!res.ok){ toast(json.error||"Impossible de supprimer ce membre."); return; }
-      toast('Membre supprimé.');
-      await loadProfiles();
-      render();
-    }catch(e){
-      console.error(e);
-      toast("Impossible de contacter le serveur.");
-    }
-  });
 }
 
 /* ======================================================================
    VIEW: NEW REPORT — pre-formatted template
    ====================================================================== */
 function viewNewReport(){
-  const editingReport=getEditingReport();
   return `
     <div class="page-head">
       <div>
-        <h1>${editingReport?'Modifier le brouillon':'Nouveau compte rendu'}</h1>
-        <div class="sub">${editingReport?'Complétez ou corrigez ce brouillon, puis envoyez-le au coordinateur pour validation.':'Remplissez le modèle ci-dessous, puis envoyez-le au coordinateur pour validation.'}</div>
+        <h1>Nouveau compte rendu</h1>
+        <div class="sub">Remplissez le modèle ci-dessous, puis envoyez-le au coordinateur pour validation.</div>
       </div>
     </div>
 
@@ -2081,45 +2016,16 @@ function addResultRow(data={indicateur:'',prevision:'',realisation:''}){
 }
 
 function wireNewReportForm(){
-  const editingReport=getEditingReport();
-  photoStore = editingReport ? editingReport.photos.map(p=>({url:p.url,caption:p.caption||''})) : [];
+  photoStore=[];
   ['objList','stepList','strengthsList','issuesList','recsList'].forEach(id=>document.getElementById(id).innerHTML='');
-
-  const fillDynList=(containerId,values,placeholder)=>{
-    const container=document.getElementById(containerId);
-    if(values && values.length){ values.forEach(v=>makeDynRow(container,placeholder,v)); }
-    else { makeDynRow(container,placeholder); }
-  };
-  fillDynList('objList', editingReport?.objectifsSpecifiques, 'Ex : Renforcer les compétences des bénéficiaires');
-  fillDynList('stepList', editingReport?.etapes, 'Ex : Formation pratique sur les techniques agricoles');
-  fillDynList('strengthsList', editingReport?.pointsForts, 'Ex : Bonne participation des bénéficiaires');
-  fillDynList('issuesList', editingReport?.difficultes, 'Ex : Accès difficile à certaines parcelles');
-  fillDynList('recsList', editingReport?.recommandations, 'Ex : Renforcer l\'appui matériel');
-
+  makeDynRow(document.getElementById('objList'),'Ex : Renforcer les compétences des bénéficiaires');
+  makeDynRow(document.getElementById('stepList'),'Ex : Formation pratique sur les techniques agricoles');
+  makeDynRow(document.getElementById('strengthsList'),'Ex : Bonne participation des bénéficiaires');
+  makeDynRow(document.getElementById('issuesList'),'Ex : Accès difficile à certaines parcelles');
+  makeDynRow(document.getElementById('recsList'),'Ex : Renforcer l\'appui matériel');
   document.getElementById('resultsBody').innerHTML='';
-  if(editingReport && editingReport.resultats && editingReport.resultats.length){
-    editingReport.resultats.forEach(r=>addResultRow({indicateur:r.indicateur||'',prevision:r.prevision??'',realisation:r.realisation??''}));
-  }else{
-    addResultRow();
-  }
+  addResultRow();
   renderPhotoThumbs();
-
-  if(editingReport){
-    document.getElementById('f-title').value=editingReport.title||'';
-    document.getElementById('f-project').value=editingReport.project==='—'?'':(editingReport.project||'');
-    document.getElementById('f-start').value=editingReport.periodStart||'';
-    document.getElementById('f-end').value=editingReport.periodEnd||'';
-    document.getElementById('f-location').value=editingReport.location==='—'?'':(editingReport.location||'');
-    document.getElementById('f-region').value=editingReport.region||'';
-    document.getElementById('f-beneficiaries').value=editingReport.beneficiaries==='—'?'':(editingReport.beneficiaries||'');
-    const respSelect=document.getElementById('f-responsible');
-    if(respSelect && editingReport.responsibleId) respSelect.value=editingReport.responsibleId;
-    document.getElementById('f-contexte').value=editingReport.contexte||'';
-    document.getElementById('f-objgen').value=editingReport.objectifGeneral||'';
-    document.getElementById('f-dates').value=editingReport.dateHoraires||'';
-    document.getElementById('f-methodes').value=editingReport.methodes||'';
-    document.getElementById('f-moyens').value=editingReport.moyens||'';
-  }
 
   document.getElementById('addObj').onclick=()=>makeDynRow(document.getElementById('objList'),'Objectif spécifique…');
   document.getElementById('addStep').onclick=()=>makeDynRow(document.getElementById('stepList'),'Étape réalisée…');
@@ -2145,7 +2051,7 @@ function wireNewReportForm(){
       realisation:tr.querySelector('.res-real').value?parseFloat(tr.querySelector('.res-real').value):0,
     })).filter(r=>r.indicateur);
     return {
-      id:editingReport?editingReport.id:uid('r'),
+      id:uid('r'),
       title,
       project:document.getElementById('f-project').value.trim()||'—',
       periodStart:document.getElementById('f-start').value||new Date().toISOString().slice(0,10),
@@ -2155,9 +2061,8 @@ function wireNewReportForm(){
       beneficiaries:document.getElementById('f-beneficiaries').value.trim()||'—',
       responsibleId:document.getElementById('f-responsible')?.value||'',
       status,
-      createdBy:editingReport?editingReport.createdBy:state.currentUserId,
-      createdAt:editingReport?editingReport.createdAt:Date.now(),
-      publishedAt:editingReport?editingReport.publishedAt:undefined,
+      createdBy:state.currentUserId,
+      createdAt:Date.now(),
       contexte:document.getElementById('f-contexte').value.trim(),
       objectifGeneral:document.getElementById('f-objgen').value.trim(),
       objectifsSpecifiques:getDynValues(document.getElementById('objList')),
@@ -2170,7 +2075,7 @@ function wireNewReportForm(){
       pointsForts:getDynValues(document.getElementById('strengthsList')),
       difficultes:getDynValues(document.getElementById('issuesList')),
       recommandations:getDynValues(document.getElementById('recsList')),
-      comments:editingReport?editingReport.comments:[],
+      comments:[],
     };
   }
 
@@ -2178,34 +2083,19 @@ function wireNewReportForm(){
     if(!DB.responsables.some(r=>r.actif!==false)){toast('Aucun responsable actif n’est disponible. Le coordinateur doit d’abord compléter ou réactiver la liste.');return;}
     if(!document.getElementById('f-responsible')?.value){toast('Veuillez sélectionner un responsable de mission.');return;}
     const report=collectReport('en_attente');
-    if(editingReport){
-      Object.assign(editingReport,report);
-      notifyCoordinators(editingReport);
-      toast('Compte rendu envoyé au coordinateur pour validation.');
-      sbUpdate('reports', mapReportToDb(editingReport), editingReport.id);
-    }else{
-      DB.reports.unshift(report);
-      notifyCoordinators(report);
-      toast('Compte rendu envoyé au coordinateur pour validation.');
-      sbInsert('reports', mapReportToDb(report));
-    }
-    state.editingReportId=null;
+    DB.reports.unshift(report);
+    notifyCoordinators(report);
+    toast('Compte rendu envoyé au coordinateur pour validation.');
+    sbInsert('reports', mapReportToDb(report));
     setView('report-detail',{activeReportId:report.id});
   };
   document.getElementById('draftReportBtn').onclick=()=>{
     if(!DB.responsables.some(r=>r.actif!==false)){toast('Aucun responsable actif n’est disponible. Le coordinateur doit d’abord compléter ou réactiver la liste.');return;}
     if(!document.getElementById('f-responsible')?.value){toast('Veuillez sélectionner un responsable de mission.');return;}
     const report=collectReport('brouillon');
-    if(editingReport){
-      Object.assign(editingReport,report);
-      toast('Brouillon mis à jour.');
-      sbUpdate('reports', mapReportToDb(editingReport), editingReport.id);
-    }else{
-      DB.reports.unshift(report);
-      toast('Brouillon enregistré. Vous pourrez le compléter plus tard.');
-      sbInsert('reports', mapReportToDb(report));
-    }
-    state.editingReportId=null;
+    DB.reports.unshift(report);
+    toast('Brouillon enregistré. Vous pourrez le compléter plus tard.');
+    sbInsert('reports', mapReportToDb(report));
     setView('reports');
   };
 }
@@ -2227,7 +2117,7 @@ function renderContent(){
   c.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>setView(b.dataset.nav));
   c.querySelectorAll('[data-goto-report]').forEach(b=>b.onclick=()=>setView('report-detail',{activeReportId:b.dataset.gotoReport}));
   c.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{state.reportFilter=b.dataset.filter;renderContent();});
-  c.querySelectorAll('[data-edit-report]').forEach(b=>b.onclick=()=>setView('new-report',{editingReportId:b.dataset.editReport}));
+  c.querySelectorAll('[data-edit-report]').forEach(b=>b.onclick=()=>toast("L'édition de brouillon est disponible dans la version connectée à la base de données."));
 
   if(state.view==='new-report') wireNewReportForm();
 
@@ -2320,7 +2210,6 @@ function renderAuthScreen(mode, errorMsg=''){
           <button class="btn btn-primary" id="authSubmit" style="width:100%;justify-content:center;margin-top:6px;">Se connecter</button>
         `}
         <div id="authError" style="color:var(--red-600);font-size:12.5px;margin-top:12px;">${errorMsg||''}</div>
-        ${errorMsg? `<button type="button" onclick="window.location.reload()" class="btn btn-outline" style="width:100%;justify-content:center;margin-top:10px;">Recharger la page</button>` : ''}
       </div>
     </div>`;
   const submit = isSetPw ? submitSetPassword : submitLogin;
@@ -2372,10 +2261,7 @@ async function startApp(){
 
 (function init(){
   if(!sb){
-    const msg = !credentialsConfigured
-      ? "Supabase n'est pas configuré : vérifiez SUPABASE_URL et SUPABASE_ANON_KEY en haut du fichier."
-      : "Impossible de charger la connexion au serveur (réseau instable ?). Rechargez la page.";
-    renderAuthScreen('login', msg);
+    renderAuthScreen('login', "Supabase n'est pas configuré : vérifiez SUPABASE_URL et SUPABASE_ANON_KEY en haut du fichier.");
     return;
   }
   if(initialAuthHash.includes('type=invite') || initialAuthHash.includes('type=recovery')){
