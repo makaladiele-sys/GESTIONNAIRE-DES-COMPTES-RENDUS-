@@ -1265,11 +1265,7 @@ function viewDashboard(){
       </div>
     </div>
 
-  ${isCoordOrAbove(u) && pending.length>0 ? `
-    <div class="validate-bar">
-      <div class="vb-text">${icon('alertTriangle')} ${pending.length} compte${pending.length>1?'s':''} rendu${pending.length>1?'s':''} en attente de votre validation.</div>
-      <button class="btn btn-outline btn-sm" data-goto-report="${pending[0].id}">Examiner maintenant ${icon('chevRight','icon-sm')}</button>
-    </div>`:''}
+${isCoordOrAbove(u) && pending.length>0 ? ` <div class="validate-bar"> <div class="vb-text">${icon('alertTriangle')} ${pending.length} compte${pending.length>1?'s':''} rendu${pending.length>1?'s':''} en attente de votre validation.</div> <button class="btn btn-outline btn-sm" data-goto-report="${pending[0].id}">Examiner maintenant ${icon('chevRight','icon-sm')}</button> </div>` : ''}
       <div class="vb-text">${icon('alertTriangle')} ${pending.length} compte${pending.length>1?'s':''} rendu${pending.length>1?'s':''} en attente de votre validation.</div>
       <button class="btn btn-outline btn-sm" data-goto-report="${pending[0].id}">Examiner maintenant ${icon('chevRight','icon-sm')}</button>
     </div>`:''}
@@ -2467,3 +2463,4 @@ async function startApp(){
 
 
 </body></html>
+
