@@ -2877,7 +2877,11 @@ async function submitLogin(){
   errEl.textContent='';
   if(!email || !pw){ errEl.textContent='Renseignez votre e-mail et votre mot de passe.'; return; }
   const {error}=await sb.auth.signInWithPassword({email,password:pw});
-  if(error){ errEl.textContent='E-mail ou mot de passe incorrect.'; return; }
+if(error){
+  console.error('[AUTH LOGIN]', error);
+  errEl.textContent = error.message || 'Erreur de connexion.';
+  return;
+}
   // La suite est gérée par onAuthStateChange.
 }
 
