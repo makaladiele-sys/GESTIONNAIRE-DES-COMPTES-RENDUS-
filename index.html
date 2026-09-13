@@ -903,87 +903,6 @@ function userById(id){return DB.users.find(u=>u.id===id);}
 function isSuperAdmin(u){ return u && u.role === 'super_admin'; }
 function isCoordOrAbove(u){ return u && (u.role === 'coordinateur' || u.role === 'super_admin'); }
 
-/* ---- seed: one published example mirroring the reference screenshot ---- */
-DB.reports.push({
-  id:'r1',
-  title:"Visite d'appui aux techniques agricoles",
-  project:"Projet d'appui à l'autonomisation des femmes rurales",
-  periodStart:'2025-08-12',periodEnd:'2025-08-15',
-  location:'Commune de Kolda',region:'Région de Kolda',
-  beneficiaries:'50 femmes',
-  responsibleId:'u1',
-  status:'publie',
-  createdBy:'u2',
-  createdAt:Date.now()-1000*60*60*24*3,
-  publishedAt:Date.now()-1000*60*60*24*2,
-  contexte:"Cette activité s'inscrit dans le cadre du projet d'appui à l'autonomisation des femmes rurales. Elle vise à renforcer les capacités des bénéficiaires en matière de techniques agricoles durables et de gestion des activités génératrices de revenus. La zone de Kolda, fortement agricole, présente un fort potentiel mais fait face à des difficultés liées à l'accès aux ressources et à la commercialisation des produits.",
-  objectifGeneral:"Contribuer à l'amélioration des conditions de vie des femmes rurales de Kolda.",
-  objectifsSpecifiques:[
-    "Renforcer les compétences techniques des bénéficiaires.",
-    "Favoriser la diversification des activités génératrices de revenus.",
-    "Sensibiliser à la gestion financière et à la commercialisation des produits."
-  ],
-  dateHoraires:'12 au 15 août 2025 (de 8h à 16h)',
-  etapes:[
-    "Accueil et présentation du projet",
-    "Formation pratique sur les techniques agricoles",
-    "Atelier sur la gestion financière",
-    "Visite des parcelles et échanges",
-    "Évaluation et clôture"
-  ],
-  methodes:"Exposés, ateliers pratiques, échanges, visites de terrain.",
-  moyens:"Supports pédagogiques, matériel agricole, transport, équipe d'animation.",
-  photos:[
-    {url:'https://images.unsplash.com/photo-1594708767771-a7502209ff51?w=700&q=80',caption:"Formation pratique sur les techniques agricoles"},
-    {url:'https://images.unsplash.com/photo-1594708767771-a7502209ff51?w=700&q=80',caption:"Atelier sur la gestion financière et la commercialisation"}
-  ],
-  resultats:[
-    {indicateur:'Femmes formées',prevision:50,realisation:50},
-    {indicateur:'Parcelles visitées',prevision:5,realisation:5},
-    {indicateur:"Sessions d'atelier",prevision:3,realisation:3},
-    {indicateur:'Satisfaction des bénéficiaires',prevision:null,realisation:95,isPercent:true},
-  ],
-  pointsForts:['Bonne participation des bénéficiaires','Qualité des échanges','Satisfaction générale élevée'],
-  difficultes:['Accès difficile à certaines parcelles','Manque de matériel agricole','Transport limité'],
-  recommandations:["Renforcer l'appui matériel",'Prévoir un meilleur transport','Multiplier ce type de formation'],
-  comments:[
-    {id:uid('c'),authorId:'u1',text:"Excellent compte rendu, très clair. Bravo à toute l'équipe pour cette mission.",createdAt:Date.now()-1000*60*60*20},
-    {id:uid('c'),authorId:'u3',text:"Le taux de satisfaction de 95% est très encourageant. On pourrait dupliquer ce format dans la zone de Vélingara.",createdAt:Date.now()-1000*60*60*10},
-  ]
-});
-
-DB.reports.push({
-  id:'r2',
-  title:"Suivi des activités génératrices de revenus",
-  project:"Projet d'appui à l'autonomisation des femmes rurales",
-  periodStart:'2025-08-28',periodEnd:'2025-08-29',
-  location:'Commune de Vélingara',region:'Région de Kolda',
-  beneficiaries:'32 femmes',
-  responsibleId:'u4',
-  status:'en_attente',
-  createdBy:'u4',
-  createdAt:Date.now()-1000*60*60*5,
-  contexte:"Visite de suivi des groupements ayant bénéficié d'un appui en petit élevage et transformation de produits locaux, afin d'évaluer l'avancement des activités et d'identifier les besoins complémentaires.",
-  objectifGeneral:"Évaluer l'avancement des activités génératrices de revenus soutenues par le projet.",
-  objectifsSpecifiques:["Vérifier l'utilisation des équipements fournis.","Identifier les difficultés rencontrées par les groupements.","Recueillir les besoins en accompagnement complémentaire."],
-  dateHoraires:'28 au 29 août 2025 (de 9h à 15h)',
-  etapes:["Rencontre avec les groupements","Visite des unités de transformation","Entretiens individuels","Restitution et clôture"],
-  methodes:"Entretiens semi-structurés, observation directe, focus group.",
-  moyens:"Grille d'entretien, véhicule de service, appareil photo.",
-  photos:[
-    {url:'https://images.unsplash.com/photo-1591634616938-1dfa4dbf5470?w=700&q=80',caption:"Rencontre avec les membres du groupement"},
-    {url:'https://images.unsplash.com/photo-1591189863430-ab87e120f312?w=700&q=80',caption:"Visite de l'unité de transformation"}
-  ],
-  resultats:[
-    {indicateur:'Groupements visités',prevision:4,realisation:4},
-    {indicateur:'Femmes rencontrées',prevision:35,realisation:32},
-    {indicateur:'Équipements fonctionnels',prevision:100,realisation:88,isPercent:true},
-  ],
-  pointsForts:['Bonne appropriation des équipements','Dynamisme des groupements'],
-  difficultes:["Une unité de transformation à l'arrêt par panne","Accès difficile en saison des pluies"],
-  recommandations:["Prévoir une maintenance préventive des équipements","Organiser une session de recyclage technique"],
-  comments:[]
-});
 
 DB.reports.push({
   id:'r3',
@@ -1014,15 +933,6 @@ DB.reports.push({
   comments:[]
 });
 
-/* ---- seed tasks / missions ---- */
-DB.tasks.push(
-  {id:uid('t'),title:"Formation en techniques agricoles durables",project:"Autonomisation des femmes rurales",location:"Kolda",assignedTo:'u2',dueDate:'2025-09-12',status:'termine',priority:'haute'},
-  {id:uid('t'),title:"Suivi post-visite des groupements de Vélingara",project:"Autonomisation des femmes rurales",location:"Vélingara",assignedTo:'u4',dueDate:'2025-09-10',status:'en_cours',priority:'haute'},
-  {id:uid('t'),title:"Reconnaissance du site de forage",project:"Accès à l'eau potable",location:"Médina Yoro Foulah",assignedTo:'u3',dueDate:'2025-09-15',status:'en_cours',priority:'moyenne'},
-  {id:uid('t'),title:"Livraison de matériel agricole",project:"Autonomisation des femmes rurales",location:"Kolda",assignedTo:'u5',dueDate:'2025-09-18',status:'a_faire',priority:'moyenne'},
-  {id:uid('t'),title:"Atelier de gestion financière — session 2",project:"Autonomisation des femmes rurales",location:"Kolda",assignedTo:'u2',dueDate:'2025-09-22',status:'a_faire',priority:'basse'},
-  {id:uid('t'),title:"Rapport trimestriel consolidé",project:"Tous projets",location:"Siège",assignedTo:'u1',dueDate:'2025-09-30',status:'a_faire',priority:'haute'},
-);
 
 /* ======================================================================
    APP STATE
