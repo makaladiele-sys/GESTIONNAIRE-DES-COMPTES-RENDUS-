@@ -896,7 +896,10 @@ const DB = {
 
   notifications:[], // {id,userId,text,reportId,createdAt,read}
 };
-function userById(id){return DB.users.find(u=>u.id===id);}
+function userById(id){
+  if(!id) return null;
+  return DB.users.find(u=>u.id===id) || null;
+}
 function isSuperAdmin(u){ return u && u.role === 'super_admin'; }
 function isCoordOrAbove(u){ return u && (u.role === 'coordinateur' || u.role === 'super_admin'); }
 
@@ -1252,7 +1255,16 @@ function viewReportsList(){
   `;
 }
 function reportCardHtml(r){
-  const commenters=[...new Set(r.comments.map(c=>c.authorId))].slice(0,3).map(userById);
+  const comments = Array.isArray(r.comments) ? r.comments : [];
+
+  const commenters = [...new Set(
+    comments
+      .map(c => c && c.authorId)
+      .filter(Boolean)
+  )]
+  .slice(0,3)
+  .map(userById)
+  .filter(Boolean);
   return `
     <div class="report-card" data-goto-report="${r.id}">
       <div class="rc-top">
@@ -1271,7 +1283,8 @@ function reportCardHtml(r){
         <div class="rc-avatars">
           ${commenters.length? commenters.map(c=>`<div class="mini-av" style="background:${colorFor(c.id)}">${initials(c.name)}</div>`).join('') : `<span>${icon('comment','icon-sm')} Aucun commentaire</span>`}
         </div>
-        ${commenters.length?`<span>${r.comments.length} commentaire${r.comments.length>1?'s':''}</span>`:''}
+${comments.length ? `<span>${comments.length}
+commentaire${comments.length>1?'s':''}</span>` : ''}
       </div>
     </div>
   `;
@@ -1469,7 +1482,12 @@ function viewTasks(){
         </tr></thead>
         <tbody>
           ${list.map(t=>{
-            const a=userById(t.assignedTo);
+            const a=userById(t.assignedTo) || {
+  id: '',
+  name: 'Utilisateur inconnu',
+  role: '',
+  fonction: ''
+};
             return `<tr>
               <td style="font-weight:600;color:var(--ink-900)">${t.title}</td>
               <td>${t.project}</td>
