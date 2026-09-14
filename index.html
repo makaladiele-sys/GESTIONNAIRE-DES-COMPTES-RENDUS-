@@ -794,6 +794,11 @@ console.error('Erreur envoi e-mail coordinateur:', err);
 }
 }
 }
+function unreadFor(userId){return DB.notifications.filter(n=>n.userId===userId && !n.read).length;}
+function markAllRead(userId){
+DB.notifications.forEach(n=>{if(n.userId===userId)n.read=true;});
+if(sb) sb.from('notifications').update({read:true}).eq('user_id',userId).eq('read',false).then(({error})=>{if(error)console.error(error);});
+}
 const NAV_ITEMS=[
 {id:'dashboard',label:'Tableau de bord',icon:'home'},
 {id:'reports',label:'Comptes rendus',icon:'file'},
