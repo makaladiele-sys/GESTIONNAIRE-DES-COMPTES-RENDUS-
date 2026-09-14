@@ -904,36 +904,6 @@ function isSuperAdmin(u){ return u && u.role === 'super_admin'; }
 function isCoordOrAbove(u){ return u && (u.role === 'coordinateur' || u.role === 'super_admin'); }
 
 
-DB.reports.push({
-  id:'r3',
-  title:"Visite exploratoire — nouveau site d'intervention",
-  project:"Projet d'accès à l'eau potable",
-  periodStart:'2025-09-01',periodEnd:'2025-09-01',
-  location:'Commune de Médina Yoro Foulah',region:'Région de Kolda',
-  beneficiaries:'—',
-  responsibleId:'u3',
-  status:'brouillon',
-  createdBy:'u3',
-  createdAt:Date.now()-1000*60*60*2,
-  contexte:"",
-  objectifGeneral:"",
-  objectifsSpecifiques:[""],
-  dateHoraires:'',
-  etapes:[""],
-  methodes:"",
-  moyens:"",
-  photos:[
-    {url:'https://images.unsplash.com/photo-1541544537156-7627a7a4aa1c?w=700&q=80',caption:"Repérage du site pressenti pour le forage"},
-    {url:'https://images.unsplash.com/photo-1541252260730-0412e8e2108e?w=700&q=80',caption:"Échanges avec les habitants du village"}
-  ],
-  resultats:[],
-  pointsForts:[""],
-  difficultes:[""],
-  recommandations:[""],
-  comments:[]
-});
-
-
 /* ======================================================================
    APP STATE
    ====================================================================== */
