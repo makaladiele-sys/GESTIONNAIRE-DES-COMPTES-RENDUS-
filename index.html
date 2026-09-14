@@ -1724,38 +1724,200 @@ function openInviteModal(kind){
   const close=()=>overlay.remove();
   overlay.querySelector('#membreClose').onclick=close;
   overlay.querySelector('#membreCancel').onclick=close;
-  overlay.querySelector('#membreSave').onclick=async()=>{
-    const name=overlay.querySelector('#membre-name').value.trim();
-    const email=overlay.querySelector('#membre-email').value.trim();
-    const fonction=overlay.querySelector('#membre-fonction').value.trim();
-    if(!name || !email){ toast('Le nom et l\u2019e-mail sont obligatoires.'); return; }
-    if(!/^\S+@\S+\.\S+$/.test(email)){ toast('Veuillez saisir une adresse e-mail valide.'); return; }
-    const saveBtn=overlay.querySelector('#membreSave');
-    saveBtn.disabled=true; saveBtn.textContent='Envoi…';
-    try{
-      const {data:{session}} = await sb.auth.getSession();
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/invite-member`,{
-        method:'POST',
-        headers:{
-          'Content-Type':'application/json',
-          'Authorization':`Bearer ${session.access_token}`,
-          'apikey':SUPABASE_ANON_KEY,
-        },
-        body:JSON.stringify({name,email,fonction}),
-      });
-      const json = await res.json();
-      if(!res.ok){ toast(json.error||"Impossible d'envoyer l'invitation."); saveBtn.disabled=false; saveBtn.textContent="Envoyer l'invitation"; return; }
-      toast(`Invitation envoyée à ${email}.`,'mail');
-      close();
-      await loadProfiles();
-      render();
-    }catch(e){
-      console.error(e);
-      toast("Impossible de contacter le serveur d'invitation.");
-      saveBtn.disabled=false; saveBtn.textContent="Envoyer l'invitation";
+overlay.querySelector('#membreSave').onclick = async () => {
+
+  const name =
+    overlay.querySelector('#membre-name').value.trim();
+
+  const email =
+    overlay.querySelector('#membre-email').value.trim();
+
+  const fonction =
+    overlay.querySelector('#membre-fonction').value.trim();
+
+  // Vérification des champs obligatoires
+  if (!name || !email) {
+    toast('Le nom et l’e-mail sont obligatoires.');
+    return;
+  }
+
+  // Vérification de l'e-mail
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    toast('Veuillez saisir une adresse e-mail valide.');
+    return;
+  }
+
+  const saveBtn =
+    overlay.querySelector('#membreSave');
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Envoi…';
+
+  try {
+
+    // ==========================================
+    // RÉCUPÉRER LA SESSION SUPABASE
+    // ==========================================
+
+    const {
+      data: { session },
+      error: sessionError
+    } = await sb.auth.getSession();
+
+    if (sessionError) {
+      console.error(
+        '[INVITE] Erreur session:',
+        sessionError
+      );
+
+      toast(
+        'Impossible de récupérer votre session.'
+      );
+
+      saveBtn.disabled = false;
+      saveBtn.innerHTML =
+        `${icon('mail')} Envoyer l'invitation`;
+
+      return;
     }
-  };
-}
+
+    if (!session || !session.access_token) {
+
+      console.error(
+        '[INVITE] Aucune session active.'
+      );
+
+      toast(
+        'Votre session a expiré. Veuillez vous reconnecter.'
+      );
+
+      saveBtn.disabled = false;
+      saveBtn.innerHTML =
+        `${icon('mail')} Envoyer l'invitation`;
+
+      return;
+    }
+
+    console.log(
+      '[INVITE] Envoi de l’invitation à:',
+      email
+    );
+
+    // ==========================================
+    // APPEL EDGE FUNCTION
+    // ==========================================
+
+    const res =
+      await fetch(
+        `${SUPABASE_URL}/functions/v1/invite-member`,
+        {
+          method: 'POST',
+
+          headers: {
+            'Content-Type': 'application/json',
+
+            'Authorization':
+              `Bearer ${session.access_token}`,
+
+            'apikey':
+              SUPABASE_ANON_KEY
+          },
+
+          // IMPORTANT :
+          // aucun e-mail codé en dur
+          // aucun rôle envoyé depuis le navigateur
+          body: JSON.stringify({
+            name,
+            email,
+            fonction
+          })
+        }
+      );
+
+    // ==========================================
+    // LIRE LA RÉPONSE
+    // ==========================================
+
+    let result = {};
+
+    try {
+      result = await res.json();
+    } catch (jsonError) {
+      console.error(
+        '[INVITE] Réponse non JSON:',
+        jsonError
+      );
+    }
+
+    console.log(
+      '[INVITE] Réponse serveur:',
+      res.status,
+      result
+    );
+
+    // ==========================================
+    // ERREURS
+    // ==========================================
+
+    if (!res.ok) {
+
+      const message =
+        result?.error ||
+        `Erreur serveur (${res.status}).`;
+
+      toast(message);
+
+      console.error(
+        '[INVITE] Échec:',
+        message
+      );
+
+      saveBtn.disabled = false;
+      saveBtn.innerHTML =
+        `${icon('mail')} Envoyer l'invitation`;
+
+      return;
+    }
+
+    // ==========================================
+    // SUCCÈS
+    // ==========================================
+
+    console.log(
+      '[INVITE] Utilisateur créé:',
+      result
+    );
+
+    toast(
+      `Invitation envoyée à ${email}.`
+    );
+
+    // Fermer la fenêtre
+    close();
+
+    // Actualiser l'affichage des membres
+    if (typeof render === 'function') {
+      await render();
+    }
+
+  } catch (error) {
+
+    console.error(
+      '[INVITE] Erreur:',
+      error
+    );
+
+    toast(
+      error?.message ||
+      'Une erreur est survenue lors de l’envoi de l’invitation.'
+    );
+
+    saveBtn.disabled = false;
+
+    saveBtn.innerHTML =
+      `${icon('mail')} Envoyer l'invitation`;
+  }
+};
  /* ======================================================================
    VIEW: COORDINATEURS — invitation par le Super Admin uniquement
    ====================================================================== */
