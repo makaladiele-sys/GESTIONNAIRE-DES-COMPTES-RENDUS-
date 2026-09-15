@@ -1238,12 +1238,11 @@ function viewReportDetail(){
             <div class="proj">${r.project}</div>
           </div>
         </div>
-        <div class="detail-actions">
+         <div class="detail-actions">
           ${statusBadge(r.status)}
           <button class="btn btn-yellow" onclick="window.print()">${icon('print')} Imprimer</button>
+          ${canDeleteReport(r, u) ? `<button class="btn btn-danger-outline" id="deleteReportBtn">${icon('trash')} Supprimer</button>` : ''}
         </div>
-      </div>
-
       <div class="meta-grid">
         <div class="meta-box"><div class="mi" style="background:var(--blue-50)">${icon('calendar','icon-sm',getComputedStyle(document.documentElement).getPropertyValue('--blue-700'))}</div>
           <div class="ml"><div class="k">Période</div><div class="v">${fmtDateShort(r.periodStart)}${r.periodEnd&&r.periodEnd!==r.periodStart?' – '+fmtDateShort(r.periodEnd):''}</div></div></div>
