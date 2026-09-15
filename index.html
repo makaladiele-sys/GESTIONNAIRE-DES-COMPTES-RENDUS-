@@ -541,6 +541,7 @@ x:`<path d="M18 6 6 18M6 6l12 12"/>`
 function icon(name,cls='icon',stroke='currentColor'){
 return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]||''}</svg>`;
 }
+const LOGO_SRC = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAuIAAAEmCAIAAACoEGJXAAAQAElEQVR4Aey9B4AlR3UufE6FDjdMntksaZWzQEKACRYZYZIRBowN2Ob...';
 const SUPABASE_URL = 'https://xnudovkpzolgpkmgzxfr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhudWRvdmtwem9sZ3BrbWd6eGZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3MjI4ODIsImV4cCI6MjEwNDI5ODg4Mn0.Uk9on4jovU-p6rKq_7D7CDrUfcDDNjmJH-oFXOg5nNc';
 const supabaseReady = typeof window.supabase !== 'undefined'
@@ -809,7 +810,7 @@ function renderSidebar(){
 const u=currentUser();
 document.getElementById('sidebar').innerHTML=`
 <div class="brand">
-<div class="brand-logo-wrap"><img class="brand-logo" src="" alt="ADEL S.A.S."></div>
+<div class="brand-logo-wrap"><img class="brand-logo" src="${document.querySelector('.brand .brand-logo').src}" alt="ADEL S.A.S."></div> 
 <div class="brand-text">
 <div class="b1">TERRAIN&nbsp;SUITE</div>
 <div class="b2">Comptes rendus de mission</div>
@@ -1167,8 +1168,7 @@ ${statusBadge(r.status)}
 <div class="card card-pad">
 <div class="section-title"><div class="ic" style="background:var(--blue-50)">${icon('comment','icon-sm',getComputedStyle(document.documentElement).getPropertyValue('--blue-700'))}</div><h3>Commentaires ${r.comments.length?`(${r.comments.length})`:''}</h3></div>
 ${r.comments.length? r.comments.map(c=>{
-const a=userById(c.authorId);
-return `<div class="comment">
+const a=userById(c.authorId) || {id:'', name:'Utilisateur inconnu'}; return `<div class="comment">
 <div class="avatar" style="background:${colorFor(a.id)};width:32px;height:32px;font-size:11.5px;">${initials(a.name)}</div>
 <div class="c-body">
 <div class="c-head"><span class="c-name">${a.name}</span><span class="c-time">${timeAgo(c.createdAt)}</span></div>
@@ -1918,7 +1918,7 @@ return `
 <div class="stack">
 <div class="card card-pad">
 <div class="section-title"><div class="ic" style="background:var(--blue-50)">${icon('file','icon-sm',getComputedStyle(document.documentElement).getPropertyValue('--blue-700'))}</div><h3>Informations générales</h3></div>
-<div class="field"><label>Titre du compte rendu</label><input type="text" id="f-title" placeholder="Ex : Visite d'appui aux techniques agricoles"></div>
+<input type="text" id="f-title" placeholder="Ex : Visite d'appui aux techniques agricoles" autocomplete="off"> 
 <div class="field"><label>Projet concerné</label><input type="text" id="f-project" placeholder="Ex : Projet d'appui à l'autonomisation des femmes rurales"></div>
 <div class="field-row2">
 <div class="field"><label>Début de la période</label><input type="date" id="f-start"></div>
@@ -2077,14 +2077,22 @@ document.getElementById('addStrength').onclick=()=>makeDynRow(document.getElemen
 document.getElementById('addIssue').onclick=()=>makeDynRow(document.getElementById('issuesList'),'Difficulté rencontrée…');
 document.getElementById('addRec').onclick=()=>makeDynRow(document.getElementById('recsList'),'Recommandation…');
 document.getElementById('addResult').onclick=()=>addResultRow();
-document.getElementById('photoInput').onchange=(e)=>{
-[...e.target.files].forEach(file=>{
-const reader=new FileReader();
-reader.onload=(ev)=>{ photoStore.push({url:ev.target.result,caption:''}); renderPhotoThumbs(); };
-reader.readAsDataURL(file);
-});
+document.getElementById('photoInput').onchange=async(e)=>{
+const files=[...e.target.files];
 e.target.value='';
-};
+for(const file of files){
+const path=`${state.currentUserId}/${uid('photo')}-${file.name}`;
+const {error}=await sb.storage.from('report-photos').upload(path,file);
+if(error){
+console.error(error);
+toast("Échec de l'upload de la photo : "+file.name);
+continue;
+}
+const {data}=sb.storage.from('report-photos').getPublicUrl(path);
+photoStore.push({url:data.publicUrl,caption:''});
+renderPhotoThumbs();
+}
+}; 
 function collectReport(status){
 const title=document.getElementById('f-title').value.trim()||'Compte rendu sans titre';
 const results=[...document.getElementById('resultsBody').querySelectorAll('tr')].map(tr=>({
