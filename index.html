@@ -1498,270 +1498,387 @@ FONCTION CORRIGÉE — openInviteModal(kind)
 L'accolade de fermeture manquante à la fin a été ajoutée.
 ====================================================================== */
 function openInviteModal(kind) {
-// kind = "coordinateur" ou "membre"
-const overlay = document.createElement('div');
-overlay.className = 'modal-overlay';
-const label =
-kind === 'coordinateur'
-? 'coordinateur'
-: 'membre';
-overlay.innerHTML = `
-<div class="modal-card">
-<div class="modal-head">
-<h3>Ajouter un ${label}</h3>
-<button
-class="icon-btn"
-id="membreClose"
-type="button">
-${icon('x', 'icon-sm')}
-</button>
-</div>
-<div class="modal-body">
-<div class="field">
-<label>
-Nom complet
-<span style="color:var(--red-600)">*</span>
-</label>
-<input
-type="text"
-id="membre-name"
-placeholder="Ex : Fatou Sarr"
-autocomplete="name"
-autofocus>
-</div>
-<div class="field">
-<label>Fonction</label>
-<input
-type="text"
-id="membre-fonction"
-placeholder="Ex : Animatrice terrain"
-autocomplete="organization-title">
-</div>
-<div class="field">
-<label>
-E-mail
-<span style="color:var(--red-600)">*</span>
-</label>
-<input
-type="email"
-id="membre-email"
-placeholder="nom@entreprise.sn"
-autocomplete="email">
-</div>
-<div class="hint">
-La personne recevra un e-mail avec un lien pour
-définir son mot de passe et accéder à l'application
-en tant que ${label}.
-</div>
-</div>
-<div class="modal-foot">
-<button
-class="btn btn-outline"
-id="membreCancel"
-type="button">
-Annuler
-</button>
-<button
-class="btn btn-primary"
-id="membreSave"
-type="button">
-${icon('mail')} Envoyer l'invitation
-</button>
-</div>
-</div>
-`;
-document.body.appendChild(overlay);
-// ==========================================
-// FERMER LA FENÊTRE
-// ==========================================
-const close = () => overlay.remove();
-overlay
-.querySelector('#membreClose')
-.onclick = close;
-overlay
-.querySelector('#membreCancel')
-.onclick = close;
-// ==========================================
-// BOUTON ENVOYER
-// ==========================================
-overlay
-.querySelector('#membreSave')
-.onclick = async () => {
-const name =
-overlay
-.querySelector('#membre-name')
-.value
-.trim();
-const email =
-overlay
-.querySelector('#membre-email')
-.value
-.trim()
-.toLowerCase();
-const fonction =
-overlay
-.querySelector('#membre-fonction')
-.value
-.trim();
-// ========================================
-// VALIDATION NOM + E-MAIL
-// ========================================
-if (!name || !email) {
-toast(
-'Le nom et l’e-mail sont obligatoires.'
-);
-return;
-}
-if (!/^\S+@\S+\.\S+$/.test(email)) {
-toast(
-'Veuillez saisir une adresse e-mail valide.'
-);
-return;
-}
-const saveBtn =
-overlay.querySelector('#membreSave');
-saveBtn.disabled = true;
-saveBtn.textContent = 'Envoi…';
-try {
-// ======================================
-// RÉCUPÉRER LA SESSION SUPABASE
-// ======================================
-const {
-data: { session },
-error: sessionError
-} = await sb.auth.getSession();
-if (sessionError) {
-console.error(
-'[INVITE] Erreur session:',
-sessionError
-);
-toast(
-'Impossible de récupérer votre session.'
-);
-saveBtn.disabled = false;
-saveBtn.innerHTML =
-`${icon('mail')} Envoyer l'invitation`;
-return;
-}
-if (!session || !session.access_token) {
-console.error(
-'[INVITE] Aucune session active.'
-);
-toast(
-'Votre session a expiré. Veuillez vous reconnecter.'
-);
-saveBtn.disabled = false;
-saveBtn.innerHTML =
-`${icon('mail')} Envoyer l'invitation`;
-return;
-}
-// ======================================
-// APPEL EDGE FUNCTION
-// ======================================
-console.log(
-'[INVITE] Envoi:',
-{
-name,
-email,
-fonction,
-kind
-}
-);
-const res =
-await fetch(
-`${SUPABASE_URL}/functions/v1/invite-member`,
-{
-method: 'POST',
-headers: {
-'Content-Type': 'application/json',
-'Authorization':
-`Bearer ${session.access_token}`,
-'apikey':
-SUPABASE_ANON_KEY
-},
-/*
-* IMPORTANT :
-* Aucun e-mail n'est codé en dur.
-*
-* Aucun rôle n'est envoyé ici.
-*
-* L'Edge Function détermine
-* automatiquement le rôle selon
-* l'utilisateur connecté.
-*/
-body: JSON.stringify({
-name,
-email,
-fonction
-})
-}
-);
-// ======================================
-// LIRE LA RÉPONSE
-// ======================================
-let result = {};
-try {
-result = await res.json();
-} catch (jsonError) {
-console.error(
-'[INVITE] Réponse non JSON:',
-jsonError
-);
-}
-console.log(
-'[INVITE] Réponse:',
-res.status,
-result
-);
-// ======================================
-// ERREUR SERVEUR
-// ======================================
-if (!res.ok) {
-const message =
-result?.error ||
-`Erreur serveur (${res.status}).`;
-console.error(
-'[INVITE] Échec:',
-message
-);
-toast(message);
-saveBtn.disabled = false;
-saveBtn.innerHTML =
-`${icon('mail')} Envoyer l'invitation`;
-return;
-}
-// ======================================
-// SUCCÈS
-// ======================================
-console.log(
-'[INVITE] Utilisateur créé:',
-result
-);
-toast(
-`Invitation envoyée à ${email}.`
-);
-// Fermer la fenêtre
-close();
-// Actualiser la liste
-if (typeof render === 'function') {
-await render();
-}
-} catch (error) {
-console.error(
-'[INVITE] Erreur:',
-error
-);
-toast(
-error?.message ||
-'Une erreur est survenue lors de l’envoi de l’invitation.'
-);
-saveBtn.disabled = false;
-saveBtn.innerHTML =
-`${icon('mail')} Envoyer l'invitation`;
-}
-};
-}
-/* ====================================================================== */
+
+  // kind = "coordinateur" ou "membre"
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+
+  const label =
+    kind === 'coordinateur'
+      ? 'coordinateur'
+      : 'membre';
+
+  overlay.innerHTML = `
+
+    <div class="modal-card">
+
+      <div class="modal-head">
+
+        <h3>Ajouter un ${label}</h3>
+
+        <button
+          class="icon-btn"
+          id="membreClose"
+          type="button">
+          ${icon('x', 'icon-sm')}
+        </button>
+
+      </div>
+
+      <div class="modal-body">
+
+        <div class="field">
+
+          <label>
+            Nom complet
+            <span style="color:var(--red-600)">*</span>
+          </label>
+
+          <input
+            type="text"
+            id="membre-name"
+            placeholder="Ex : Fatou Sarr"
+            autocomplete="name"
+            autofocus>
+
+        </div>
+
+        <div class="field">
+
+          <label>Fonction</label>
+
+          <input
+            type="text"
+            id="membre-fonction"
+            placeholder="Ex : Animatrice terrain"
+            autocomplete="organization-title">
+
+        </div>
+
+        <div class="field">
+
+          <label>
+            E-mail
+            <span style="color:var(--red-600)">*</span>
+          </label>
+
+          <input
+            type="email"
+            id="membre-email"
+            placeholder="nom@entreprise.sn"
+            autocomplete="email">
+
+        </div>
+
+        <div class="hint">
+
+          La personne recevra un e-mail avec un lien pour
+          définir son mot de passe et accéder à l'application
+          en tant que ${label}.
+
+        </div>
+
+      </div>
+
+      <div class="modal-foot">
+
+        <button
+          class="btn btn-outline"
+          id="membreCancel"
+          type="button">
+          Annuler
+        </button>
+
+        <button
+          class="btn btn-primary"
+          id="membreSave"
+          type="button">
+          ${icon('mail')} Envoyer l'invitation
+        </button>
+
+      </div>
+
+    </div>
+
+  `;
+
+  document.body.appendChild(overlay);
+
+  // ==========================================
+  // FERMER LA FENÊTRE
+  // ==========================================
+
+  const close = () => overlay.remove();
+
+  overlay.querySelector('#membreClose').onclick = close;
+  overlay.querySelector('#membreCancel').onclick = close;
+
+  // ==========================================
+  // BOUTON ENVOYER
+  // ==========================================
+
+  overlay.querySelector('#membreSave').onclick = async () => {
+
+    const name =
+      overlay
+        .querySelector('#membre-name')
+        .value
+        .trim();
+
+    const email =
+      overlay
+        .querySelector('#membre-email')
+        .value
+        .trim()
+        .toLowerCase();
+
+    const fonction =
+      overlay
+        .querySelector('#membre-fonction')
+        .value
+        .trim();
+
+    // ========================================
+    // RÔLE
+    // ========================================
+
+    const role =
+      kind === 'coordinateur'
+        ? 'coordinateur'
+        : 'membre';
+
+    // ========================================
+    // VALIDATION
+    // ========================================
+
+    if (!name || !email) {
+
+      toast(
+        'Le nom et l’e-mail sont obligatoires.'
+      );
+
+      return;
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+
+      toast(
+        'Veuillez saisir une adresse e-mail valide.'
+      );
+
+      return;
+    }
+
+    // ========================================
+    // BOUTON EN CHARGEMENT
+    // ========================================
+
+    const saveBtn =
+      overlay.querySelector('#membreSave');
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Envoi…';
+
+    try {
+
+      // ======================================
+      // RÉCUPÉRATION DE LA SESSION
+      // ======================================
+
+      const {
+        data: { session },
+        error: sessionError
+      } = await sb.auth.getSession();
+
+      if (sessionError) {
+
+        console.error(
+          '[INVITE] Erreur session:',
+          sessionError
+        );
+
+        toast(
+          'Impossible de récupérer votre session.'
+        );
+
+        saveBtn.disabled = false;
+
+        saveBtn.innerHTML =
+          `${icon('mail')} Envoyer l'invitation`;
+
+        return;
+      }
+
+      if (!session || !session.access_token) {
+
+        console.error(
+          '[INVITE] Aucune session active.'
+        );
+
+        toast(
+          'Votre session a expiré. Veuillez vous reconnecter.'
+        );
+
+        saveBtn.disabled = false;
+
+        saveBtn.innerHTML =
+          `${icon('mail')} Envoyer l'invitation`;
+
+        return;
+      }
+
+      // ======================================
+      // URL DE RETOUR APRÈS ACTIVATION
+      // ======================================
+
+      const redirectTo =
+        window.location.origin +
+        window.location.pathname;
+
+      console.log(
+        '[INVITE] Envoi:',
+        {
+          name,
+          email,
+          fonction,
+          role,
+          redirectTo
+        }
+      );
+
+      // ======================================
+      // APPEL DE LA EDGE FUNCTION
+      // ======================================
+
+      const res = await fetch(
+
+        `${SUPABASE_URL}/functions/v1/manage-member`,
+
+        {
+          method: 'POST',
+
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization':
+              `Bearer ${session.access_token}`,
+            'apikey':
+              SUPABASE_ANON_KEY
+          },
+
+          body: JSON.stringify({
+
+            action: 'invite',
+
+            name,
+
+            email,
+
+            fonction,
+
+            role,
+
+            redirectTo
+
+          })
+        }
+      );
+
+      // ======================================
+      // LECTURE DE LA RÉPONSE
+      // ======================================
+
+      let result = {};
+
+      try {
+
+        result = await res.json();
+
+      } catch (jsonError) {
+
+        console.error(
+          '[INVITE] Réponse non JSON:',
+          jsonError
+        );
+
+      }
+
+      console.log(
+        '[INVITE] Réponse:',
+        res.status,
+        result
+      );
+
+      // ======================================
+      // ERREUR SERVEUR
+      // ======================================
+
+      if (!res.ok) {
+
+        const message =
+          result?.error ||
+          `Erreur serveur (${res.status}).`;
+
+        console.error(
+          '[INVITE] Échec:',
+          message
+        );
+
+        toast(message);
+
+        saveBtn.disabled = false;
+
+        saveBtn.innerHTML =
+          `${icon('mail')} Envoyer l'invitation`;
+
+        return;
+      }
+
+      // ======================================
+      // SUCCÈS
+      // ======================================
+
+      console.log(
+        '[INVITE] Utilisateur créé:',
+        result
+      );
+
+      toast(
+        `Invitation envoyée à ${email}.`
+      );
+
+      close();
+
+      // Actualiser la liste des membres
+
+      if (typeof render === 'function') {
+
+        await render();
+
+      }
+
+    } catch (error) {
+
+      console.error(
+        '[INVITE] Erreur:',
+        error
+      );
+
+      toast(
+        error?.message ||
+        'Une erreur est survenue lors de l’envoi de l’invitation.'
+      );
+
+      saveBtn.disabled = false;
+
+      saveBtn.innerHTML =
+        `${icon('mail')} Envoyer l'invitation`;
+
+    }
+
+  };
+
+}/* ====================================================================== */
 function viewCoordinateurs(){
 const u=currentUser();
 if(!isSuperAdmin(u)){
