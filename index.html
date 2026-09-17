@@ -538,8 +538,6 @@ image:`<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5
 chevRight:`<path d="m9 6 6 6-6 6"/>`,
 x:`<path d="M18 6 6 18M6 6l12 12"/>`,
 whatsapp:`<path d="M20.5 3.5A10.3 10.3 0 0 0 3.6 16.4L2 22l5.7-1.5A10.3 10.3 0 1 0 20.5 3.5Z"/><path d="M8.3 8.4c.2-.5.4-.5.7-.5h.5c.2 0 .4 0 .6.4.2.5.7 1.7.8 1.8.1.2.1.4 0 .6-.2.3-.3.5-.5.7-.2.2-.4.4-.2.8.2.4 1 1.5 2 2.4 1.4 1.2 2.4 1.6 2.8 1.7.4.2.6.1.8-.1.2-.2.9-1 1.1-1.3.2-.3.4-.3.7-.2.3.1 1.9.9 2.2 1 .3.2.5.2.6.4.1.2.1 1-.3 1.9-.4.9-2 1.7-2.9 1.7-.8 0-2.9-.3-5.4-2.7-2.9-2.8-3.5-5-3.6-5.5-.1-.5-.6-1.7 0-2.9Z" fill="currentColor" stroke="none"/>`
-};,
-whatsapp:`<path d="M20.5 3.5A10.3 10.3 0 0 0 3.6 16.4L2 22l5.7-1.5A10.3 10.3 0 1 0 20.5 3.5Z"/><path d="M8.3 8.4c.2-.5.4-.5.7-.5h.5c.2 0 .4 0 .6.4.2.5.7 1.7.8 1.8.1.2.1.4 0 .6-.2.3-.3.5-.5.7-.2.2-.4.4-.2.8.2.4 1 1.5 2 2.4 1.4 1.2 2.4 1.6 2.8 1.7.4.2.6.1.8-.1.2-.2.9-1 1.1-1.3.2-.3.4-.3.7-.2.3.1 1.9.9 2.2 1 .3.2.5.2.6.4.1.2.1 1-.3 1.9-.4.9-2 1.7-2.9 1.7-.8 0-2.9-.3-5.4-2.7-2.9-2.8-3.5-5-3.6-5.5-.1-.5-.6-1.7 0-2.9Z" fill="currentColor" stroke="none"/>`
 };
 function icon(name,cls='icon',stroke='currentColor'){
 return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]||''}</svg>`;
@@ -625,22 +623,6 @@ const AVATAR_COLORS = ['#00833F','#006B34','#0A9A4A','#F2C500','#24A95B','#B68F0
 function initials(name){return name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();}
 function colorFor(id){const n=id.split('').reduce((a,c)=>a+c.charCodeAt(0),0);return AVATAR_COLORS[n%AVATAR_COLORS.length];}
 function uid(p='id'){return p+'_'+Math.random().toString(36).slice(2,9);}
-function normalizePhoneSN(raw){
-if(!raw) return null;
-const digits=raw.replace(/[^\d]/g,'');
-if(!digits) return null;
-if(digits.startsWith('221') && digits.length===12) return digits;
-if(digits.length===9 && /^7[0-8]/.test(digits)) return '221'+digits;
-if(digits.startsWith('00221')) return digits.slice(2);
-return digits;
-}
-function waLink(phoneNormalized){ return phoneNormalized? `https://wa.me/${phoneNormalized}` : null; }
-function phoneCell(u){
-const norm=u.phoneNormalized || normalizePhoneSN(u.phone||'');
-if(!u.phone) return '<span style="color:var(--ink-300)">—</span>';
-const link=waLink(norm);
-return `<div style="display:flex;align-items:center;gap:8px;"><span>${u.phone}</span>${link?`<a href="${link}" target="_blank" rel="noopener" class="icon-btn icon-btn-sm" style="color:#25D366;border-color:#25D366;" title="Ouvrir WhatsApp">${icon('whatsapp','icon-sm','#25D366')}</a>`:''}</div>`;
-}
 function normalizePhoneSN(raw){
 if(!raw) return null;
 const digits=raw.replace(/[^\d]/g,'');
@@ -1514,14 +1496,14 @@ return `
 <div class="card card-pad">
 ${DB.users.length ? `
 <table class="tasks-table">
-<thead><tr><th>Coordinateur</th><th>Téléphone</th><th>Fonction</th><th>E-mail</th><th>Statut</th><th></th></tr></thead>
+<thead><tr><th>Membre</th><th>Téléphone</th><th>Fonction</th><th>E-mail</th><th>Rôle</th></tr></thead>
 <tbody>
-${coords.map(c=>`
+${DB.users.map(m=>`
 <tr>
-<td><div class="resp-name-cell"><div class="resp-avatar" style="background:${colorFor(c.id)}">${initials(c.name)}</div><strong>${c.name}</strong></div></td>
-<td>${phoneCell(c)}</td>
-<td>${c.fonction||'—'}</td>
-<td>${c.email||'—'}</td>
+<td><div class="resp-name-cell"><div class="resp-avatar" style="background:${colorFor(m.id)}">${initials(m.name)}</div><strong>${m.name}</strong>${m.id===u.id?' <span class="hint">(vous)</span>':''}</div></td>
+<td>${phoneCell(m)}</td>
+<td>${m.fonction||'—'}</td>
+<td>${m.email||'—'}</td>
 <td><span class="badge ${m.role==='coordinateur'?'badge-green':'badge-gray'}">${m.role==='coordinateur'?'Coordinateur':'Membre'}</span></td>
 </tr>`).join('')}
 </tbody>
@@ -1593,18 +1575,6 @@ function openInviteModal(kind) {
 
         </div>
 
-                <div class="field">
-
-          <label>Fonction</label>
-
-          <input
-            type="text"
-            id="membre-fonction"
-            placeholder="Ex : Animatrice terrain"
-            autocomplete="organization-title">
-
-        </div>
-
         <div class="field">
 
           <label>
@@ -1612,20 +1582,6 @@ function openInviteModal(kind) {
             <span style="color:var(--red-600)">*</span>
           </label>
 
-          <input
-            type="tel"
-            id="membre-phone"
-            placeholder="Ex : +221 77 123 45 67"
-            autocomplete="tel">
-
-        </div>
-
-        <div class="field">
-
-          <label>
-            E-mail
-            <span style="color:var(--red-600)">*</span>
-          </label>
           <input
             type="tel"
             id="membre-phone"
@@ -1711,7 +1667,7 @@ function openInviteModal(kind) {
         .trim()
         .toLowerCase();
 
-        const fonction =
+    const fonction =
       overlay
         .querySelector('#membre-fonction')
         .value
@@ -1754,15 +1710,6 @@ function openInviteModal(kind) {
       return;
     }
 
-    const phoneNorm = normalizePhoneSN(phone);
-    if (!phoneNorm || phoneNorm.length !== 12) {
-
-      toast(
-        'Numéro de téléphone invalide. Format attendu : +221 77 123 45 67.'
-      );
-
-      return;
-    }
     const phoneNorm = normalizePhoneSN(phone);
     if (!phoneNorm || phoneNorm.length !== 12) {
 
@@ -1889,6 +1836,7 @@ function openInviteModal(kind) {
           })
         }
       );
+
       // ======================================
       // LECTURE DE LA RÉPONSE
       // ======================================
@@ -1943,7 +1891,7 @@ function openInviteModal(kind) {
       // SUCCÈS
       // ======================================
 
-           console.log(
+      console.log(
         '[INVITE] Utilisateur créé:',
         result
       );
@@ -1957,6 +1905,7 @@ function openInviteModal(kind) {
       }
 
       close();
+
       // Actualiser la liste des membres
 
       if (typeof render === 'function') {
@@ -2004,15 +1953,20 @@ return `
 <div class="card card-pad">
 ${coords.length ? `
 <table class="tasks-table">
-<thead><tr><th>Membre</th><th>Téléphone</th><th>Fonction</th><th>E-mail</th><th>Rôle</th></tr></thead>
+<thead><tr><th>Coordinateur</th><th>Téléphone</th><th>Fonction</th><th>E-mail</th><th>Statut</th><th></th></tr></thead>
 <tbody>
-${DB.users.map(m=>`
+${coords.map(c=>`
 <tr>
-<td><div class="resp-name-cell"><div class="resp-avatar" style="background:${colorFor(m.id)}">${initials(m.name)}</div><strong>${m.name}</strong>${m.id===u.id?' <span class="hint">(vous)</span>':''}</div></td>
-<td>${phoneCell(m)}</td>
-<td>${m.fonction||'—'}</td>
-<td>${m.email||'—'}</td>
-<td><span class="badge ${m.role==='coordinateur'?'badge-green':'badge-gray'}">${m.role==='coordinateur'?'Coordinateur':'Membre'}</span></td>
+<td><div class="resp-name-cell"><div class="resp-avatar" style="background:${colorFor(c.id)}">${initials(c.name)}</div><strong>${c.name}</strong></div></td>
+<td>${phoneCell(c)}</td>
+<td>${c.fonction||'—'}</td>
+<td>${c.email||'—'}</td>
+<td><span class="status-pill ${c.actif===false?'inactive':'active'}"><span>●</span>${c.actif===false?'Inactif':'Actif'}</span></td>
+<td><div class="row-actions">
+<button class="icon-btn icon-btn-sm" data-edit-user="${c.id}">${icon('edit','icon-sm')}</button>
+<button class="icon-btn icon-btn-sm" data-toggle-user="${c.id}">${icon(c.actif===false?'check':'x','icon-sm')}</button>
+<button class="icon-btn icon-btn-sm danger" data-del-user="${c.id}">${icon('trash','icon-sm')}</button>
+</div></td>
 </tr>`).join('')}
 </tbody>
 </table>
