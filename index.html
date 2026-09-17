@@ -2006,21 +2006,48 @@ ${list.map(m=>`
 </div>`;
 }
 async function callAdminManageUser(payload){
-const {data:{session}} = await sb.auth.getSession();
-const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-manage-user`,{
-method:'POST',
-headers:{
-'Content-Type':'application/json',
-'Authorization':`Bearer ${session.access_token}`,
-'apikey':SUPABASE_ANON_KEY,
-},
-body:JSON.stringify(payload),
-});
-const json=await res.json();
-if(!res.ok){ toast(json.error||"Action impossible."); return null; }
-return json;
-}
-function openUserEditModal(target){
+
+  const { data: { session } } = await sb.auth.getSession();
+
+  if (!session) {
+    toast("Session expirée. Veuillez vous reconnecter.");
+    return null;
+  }
+
+  const res = await fetch(
+    `${SUPABASE_URL}/functions/v1/manage-member`,
+    {
+      method: 'POST',
+
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY
+      },
+
+      body: JSON.stringify(payload)
+    }
+  );
+
+  let json = {};
+
+  try {
+    json = await res.json();
+  } catch {
+    json = {
+      error: "Réponse invalide du serveur."
+    };
+  }
+
+  console.log('[ADMIN USER] Réponse:', res.status, json);
+
+  if (!res.ok) {
+    toast(json.error || "Action impossible.");
+    return null;
+  }
+
+  return json;
+}function openUserEditModal(target){
 const overlay=document.createElement('div'); overlay.className='modal-overlay';
 const u=currentUser();
 const canChangeRole = isSuperAdmin(u) && target.role!=='super_admin';
@@ -2038,7 +2065,8 @@ overlay.querySelector('#uedClose').onclick=close;
 overlay.querySelector('#uedCancel').onclick=close;
 overlay.querySelector('#uedSave').onclick=async()=>{
 const payload={
-action:'update', targetId:target.id,
+  action:'update',
+  userId:target.id,
 name:overlay.querySelector('#ued-name').value.trim(),
 fonction:overlay.querySelector('#ued-fonction').value.trim(),
 };
@@ -2059,7 +2087,10 @@ if(r){ toast(r.actif?`${t.name} réactivé.`:`${t.name} désactivé.`); await lo
 document.querySelectorAll('[data-del-user]').forEach(b=>b.onclick=async()=>{
 const t=DB.users.find(x=>x.id===b.dataset.delUser); if(!t) return;
 if(!confirm(`Supprimer définitivement le compte de ${t.name} ?`)) return;
-const r=await callAdminManageUser({action:'delete', targetId:t.id});
+const r=await callAdminManageUser({
+  action: 'delete',
+  userId: t.id
+});
 if(r){ toast('Compte supprimé.'); await loadProfiles(); render(); }
 });
 }
@@ -2730,3 +2761,4 @@ startApp();
 })();
 </script>
 </body></html>
+
