@@ -413,7 +413,7 @@ padding:11px 14px;border-bottom:1px solid var(--line);font-weight:600;background
 }
 .tasks-table th:first-child{border-top-left-radius:12px;}
 .tasks-table th:last-child{border-top-right-radius:12px;}
-.tasks-table td{padding:13px 14px;border-bottom:1px solid var(--line-soft);font-size:13.3px;color:var(--ink-700);vertical-align:middle;}
+.tasks-table td{padding:13px 14px;border-bottom:1px solid var(--line-soft);font-size:13.3px;color:var(--ink-700);vertical-align:middle;white-space:nowrap;}
 .tasks-table tr:last-child td{border-bottom:none;}
 .tasks-table tr:hover td{background:var(--blue-50);}
 .priority-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:7px;}
@@ -637,7 +637,7 @@ function phoneCell(u){
 const norm=u.phoneNormalized || normalizePhoneSN(u.phone||'');
 if(!u.phone) return '<span style="color:var(--ink-300)">—</span>';
 const link=waLink(norm);
-return `<div style="display:flex;align-items:center;gap:8px;"><span>${u.phone}</span>${link?`<a href="${link}" target="_blank" rel="noopener" class="icon-btn icon-btn-sm" style="color:#25D366;border-color:#25D366;" title="Ouvrir WhatsApp">${icon('whatsapp','icon-sm','#25D366')}</a>`:''}</div>`;
+return `<div style="display:flex;align-items:center;gap:8px;white-space:nowrap;"><span style="white-space:nowrap;">${u.phone}</span>${link?`<a href="${link}" target="_blank" rel="noopener" class="icon-btn icon-btn-sm" style="color:#25D366;border-color:#25D366;flex-shrink:0;" title="Ouvrir WhatsApp">${icon('whatsapp','icon-sm','#25D366')}</a>`:''}</div>`;
 }
 function fmtDate(iso){
 if(!iso) return '—';
