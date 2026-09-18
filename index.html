@@ -413,7 +413,7 @@ padding:11px 14px;border-bottom:1px solid var(--line);font-weight:600;background
 }
 .tasks-table th:first-child{border-top-left-radius:12px;}
 .tasks-table th:last-child{border-top-right-radius:12px;}
-.tasks-table td{padding:13px 14px;border-bottom:1px solid var(--line-soft);font-size:13.3px;color:var(--ink-700);vertical-align:middle;white-space:nowrap;}
+.tasks-table td{padding:13px 14px;border-bottom:1px solid var(--line-soft);font-size:13.3px;color:var(--ink-700);vertical-align:middle;}
 .tasks-table tr:last-child td{border-bottom:none;}
 .tasks-table tr:hover td{background:var(--blue-50);}
 .priority-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:7px;}
@@ -617,7 +617,7 @@ async function loadProfiles(){
 if(!sb) return;
 const {data,error} = await sb.from('profiles').select('*').order('created_at',{ascending:true});
 if(error){ console.error(error); toast("Impossible de charger la liste des membres."); return; }
-DB.users = (data||[]).map(p=>({id:p.id, name:p.name, role:p.role, fonction:p.fonction||'', email:p.email, actif:p.actif, phone:p.phone||'', phoneNormalized:p.phone_normalized||''}));
+DB.users = (data||[]).map(p=>({id:p.id, name:p.name, role:p.role, fonction:p.fonction||'', email:p.email, actif:p.actif, phone:p.phone||'', phoneNormalized:p.phone_normalized||'', coordinateurId:p.coordinateur_id||''}));
 }
 const AVATAR_COLORS = ['#00833F','#006B34','#0A9A4A','#F2C500','#24A95B','#B68F00'];
 function initials(name){return name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();}
@@ -637,7 +637,7 @@ function phoneCell(u){
 const norm=u.phoneNormalized || normalizePhoneSN(u.phone||'');
 if(!u.phone) return '<span style="color:var(--ink-300)">—</span>';
 const link=waLink(norm);
-return `<div style="display:flex;align-items:center;gap:8px;white-space:nowrap;"><span style="white-space:nowrap;">${u.phone}</span>${link?`<a href="${link}" target="_blank" rel="noopener" class="icon-btn icon-btn-sm" style="color:#25D366;border-color:#25D366;flex-shrink:0;" title="Ouvrir WhatsApp">${icon('whatsapp','icon-sm','#25D366')}</a>`:''}</div>`;
+return `<div style="display:flex;align-items:center;gap:8px;"><span>${u.phone}</span>${link?`<a href="${link}" target="_blank" rel="noopener" class="icon-btn icon-btn-sm" style="color:#25D366;border-color:#25D366;" title="Ouvrir WhatsApp">${icon('whatsapp','icon-sm','#25D366')}</a>`:''}</div>`;
 }
 function fmtDate(iso){
 if(!iso) return '—';
@@ -833,20 +833,13 @@ ${icon(it.icon)}<span>${it.label}</span>
 </button>
 `).join('')}
 ${isSuperAdmin(u) ? `
-<div class="nav-section-label">Super administration</div>
-<button class="nav-item ${state.view==='coordinateurs'?'active':''}" data-nav="coordinateurs">
-${icon('userBadge')}<span>Coordinateurs</span>
-</button>
-<button class="nav-item ${state.view==='utilisateurs'?'active':''}" data-nav="utilisateurs">
-${icon('usersBadge')}<span>Tous les utilisateurs</span>
+<div class="nav-section-label">Administration</div>
+<button class="nav-item ${state.view==='membres'?'active':''}" data-nav="membres">
+${icon('usersBadge')}<span>Membres</span>
 </button>` : ''}
 ${isCoordOrAbove(u) ? `
-<div class="nav-section-label">Administration</div>
 <button class="nav-item ${state.view==='responsables'?'active':''}" data-nav="responsables">
 ${icon('users')}<span>Responsables</span>
-</button>
-<button class="nav-item ${state.view==='membres'?'active':''}" data-nav="membres">
-${icon('usersBadge')}<span>Membres du bureau</span>
 </button>` : ''}
 </nav>
 <div class="sidebar-footer">
@@ -1476,479 +1469,46 @@ const empty=document.getElementById('respNoResult'); if(empty) empty.style.displ
 }
 function viewMembres(){
 const u=currentUser();
-if(!isCoordOrAbove(u)){
-return `<div class="empty-state"><div class="t">Accès réservé au coordinateur</div><div class="d">La gestion des membres du bureau est réservée au coordinateur.</div></div>`;
-}
-return `
-<div class="page-head">
-<div>
-<h1>Membres du bureau</h1>
-<div class="sub">Ajoutez un membre : il recevra un e-mail avec un lien pour créer son mot de passe et activer son compte.</div>
-</div>
-<button class="btn btn-primary" id="addMembreBtn">${icon('plus')} Ajouter un membre</button>
-</div>
-<div class="card card-pad">
-${DB.users.length ? `
-<table class="tasks-table">
-<thead><tr><th>Membre</th><th>Téléphone</th><th>Fonction</th><th>E-mail</th><th>Rôle</th></tr></thead>
-<tbody>
-${DB.users.map(m=>`
-<tr>
-<td><div class="resp-name-cell"><div class="resp-avatar" style="background:${colorFor(m.id)}">${initials(m.name)}</div><strong>${m.name}</strong>${m.id===u.id?' <span class="hint">(vous)</span>':''}</div></td>
-<td>${phoneCell(m)}</td>
-<td>${m.fonction||'—'}</td>
-<td>${m.email||'—'}</td>
-<td><span class="badge ${m.role==='coordinateur'?'badge-green':'badge-gray'}">${m.role==='coordinateur'?'Coordinateur':'Membre'}</span></td>
-</tr>`).join('')}
-</tbody>
-</table>
-` : `<div class="empty-state"><div class="t">Aucun membre pour l'instant</div><div class="d">Cliquez sur « Ajouter un membre » pour envoyer la première invitation.</div></div>`}
-</div>`;
-}
-function openInviteModal(kind) {
-
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-
-  const label =
-    kind === 'coordinateur'
-      ? 'coordinateur'
-      : 'membre';
-
-  overlay.innerHTML = `
-
-    <div class="modal-card">
-
-      <div class="modal-head">
-
-        <h3>Ajouter un ${label}</h3>
-
-        <button
-          class="icon-btn"
-          id="membreClose"
-          type="button">
-          ${icon('x', 'icon-sm')}
-        </button>
-
-      </div>
-
-      <div class="modal-body">
-
-        <div class="field">
-
-          <label>
-            Nom complet
-            <span style="color:var(--red-600)">*</span>
-          </label>
-
-          <input
-            type="text"
-            id="membre-name"
-            placeholder="Ex : Fatou Sarr"
-            autocomplete="name"
-            autofocus>
-
-        </div>
-
-        <div class="field">
-
-          <label>Fonction</label>
-
-          <input
-            type="text"
-            id="membre-fonction"
-            placeholder="Ex : Animatrice terrain"
-            autocomplete="organization-title">
-
-        </div>
-
-        <div class="field">
-
-          <label>
-            Téléphone
-            <span style="color:var(--red-600)">*</span>
-          </label>
-
-          <input
-            type="tel"
-            id="membre-phone"
-            placeholder="Ex : +221 77 123 45 67"
-            autocomplete="tel">
-
-        </div>
-
-        <div class="field">
-
-          <label>
-            E-mail
-            <span style="color:var(--red-600)">*</span>
-          </label>
-
-          <input
-            type="email"
-            id="membre-email"
-            placeholder="nom@entreprise.sn"
-            autocomplete="email">
-
-        </div>
-
-        <div class="hint">
-
-          La personne recevra un e-mail avec un lien pour
-          définir son mot de passe et accéder à l'application
-          en tant que ${label}.
-
-        </div>
-
-      </div>
-
-      <div class="modal-foot">
-
-        <button
-          class="btn btn-outline"
-          id="membreCancel"
-          type="button">
-          Annuler
-        </button>
-
-        <button
-          class="btn btn-primary"
-          id="membreSave"
-          type="button">
-          ${icon('mail')} Envoyer l'invitation
-        </button>
-
-      </div>
-
-    </div>
-
-  `;
-
-  document.body.appendChild(overlay);
-
-  const close = () => overlay.remove();
-
-  overlay.querySelector('#membreClose').onclick = close;
-  overlay.querySelector('#membreCancel').onclick = close;
-
-  overlay.querySelector('#membreSave').onclick = async () => {
-
-    const name =
-      overlay
-        .querySelector('#membre-name')
-        .value
-        .trim();
-
-    const email =
-      overlay
-        .querySelector('#membre-email')
-        .value
-        .trim()
-        .toLowerCase();
-
-    const fonction =
-      overlay
-        .querySelector('#membre-fonction')
-        .value
-        .trim();
-
-    const phone =
-      overlay
-        .querySelector('#membre-phone')
-        .value
-        .trim();
-
-    const role =
-      kind === 'coordinateur'
-        ? 'coordinateur'
-        : 'membre';
-
-    if (!name || !email || !phone) {
-
-      toast(
-        'Le nom, le téléphone et l’e-mail sont obligatoires.'
-      );
-
-      return;
-    }
-
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-
-      toast(
-        'Veuillez saisir une adresse e-mail valide.'
-      );
-
-      return;
-    }
-
-    const phoneNorm = normalizePhoneSN(phone);
-    if (!phoneNorm || phoneNorm.length !== 12) {
-
-      toast(
-        'Numéro de téléphone invalide. Format attendu : +221 77 123 45 67.'
-      );
-
-      return;
-    }
-
-    const saveBtn =
-      overlay.querySelector('#membreSave');
-
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Envoi…';
-
-    try {
-
-      const {
-        data: { session },
-        error: sessionError
-      } = await sb.auth.getSession();
-
-      if (sessionError) {
-
-        console.error(
-          '[INVITE] Erreur session:',
-          sessionError
-        );
-
-        toast(
-          'Impossible de récupérer votre session.'
-        );
-
-        saveBtn.disabled = false;
-
-        saveBtn.innerHTML =
-          `${icon('mail')} Envoyer l'invitation`;
-
-        return;
-      }
-
-      if (!session || !session.access_token) {
-
-        console.error(
-          '[INVITE] Aucune session active.'
-        );
-
-        toast(
-          'Votre session a expiré. Veuillez vous reconnecter.'
-        );
-
-        saveBtn.disabled = false;
-
-        saveBtn.innerHTML =
-          `${icon('mail')} Envoyer l'invitation`;
-
-        return;
-      }
-
-      const redirectTo =
-        window.location.origin +
-        window.location.pathname;
-
-      console.log(
-        '[INVITE] Envoi:',
-        {
-          name,
-          email,
-          phone,
-          fonction,
-          role,
-          redirectTo
-        }
-      );
-
-      const res = await fetch(
-
-        `${SUPABASE_URL}/functions/v1/manage-member`,
-
-        {
-          method: 'POST',
-
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization':
-              `Bearer ${session.access_token}`,
-            'apikey':
-              SUPABASE_ANON_KEY
-          },
-
-          body: JSON.stringify({
-
-            action: 'invite',
-
-            name,
-
-            email,
-
-            phone,
-
-            fonction,
-
-            role,
-
-            redirectTo
-
-          })
-        }
-      );
-
-      let result = {};
-
-      try {
-
-        result = await res.json();
-
-      } catch (jsonError) {
-
-        console.error(
-          '[INVITE] Réponse non JSON:',
-          jsonError
-        );
-
-      }
-
-      console.log(
-        '[INVITE] Réponse:',
-        res.status,
-        result
-      );
-
-      if (!res.ok) {
-
-        const message =
-          result?.error ||
-          `Erreur serveur (${res.status}).`;
-
-        console.error(
-          '[INVITE] Échec:',
-          message
-        );
-
-        toast(message);
-
-        saveBtn.disabled = false;
-
-        saveBtn.innerHTML =
-          `${icon('mail')} Envoyer l'invitation`;
-
-        return;
-      }
-
-      console.log(
-        '[INVITE] Utilisateur créé:',
-        result
-      );
-
-      toast(
-        `Compte créé pour ${email}.`
-      );
-
-      if (result.whatsappUrl) {
-        window.open(result.whatsappUrl, '_blank');
-      }
-
-      close();
-
-      if (typeof render === 'function') {
-
-        await render();
-
-      }
-
-    } catch (error) {
-
-      console.error(
-        '[INVITE] Erreur:',
-        error
-      );
-
-      toast(
-        error?.message ||
-        'Une erreur est survenue lors de l’envoi de l’invitation.'
-      );
-
-      saveBtn.disabled = false;
-
-      saveBtn.innerHTML =
-        `${icon('mail')} Envoyer l'invitation`;
-
-    }
-
-  };
-
-}
-function viewCoordinateurs(){
-const u=currentUser();
 if(!isSuperAdmin(u)){
-return `<div class="empty-state"><div class="t">Accès réservé au super administrateur</div></div>`;
-}
-const coords=DB.users.filter(x=>x.role==='coordinateur');
-return `
-<div class="page-head">
-<div>
-<h1>Coordinateurs</h1>
-<div class="sub">Le super administrateur crée les comptes coordinateurs. Chaque coordinateur pourra ensuite inviter ses propres membres.</div>
-</div>
-<button class="btn btn-primary" id="addCoordBtn">${icon('plus')} Ajouter un coordinateur</button>
-</div>
-<div class="card card-pad">
-${coords.length ? `
-<table class="tasks-table">
-<thead><tr><th>Coordinateur</th><th>Téléphone</th><th>Fonction</th><th>E-mail</th><th>Statut</th><th></th></tr></thead>
-<tbody>
-${coords.map(c=>`
-<tr>
-<td><div class="resp-name-cell"><div class="resp-avatar" style="background:${colorFor(c.id)}">${initials(c.name)}</div><strong>${c.name}</strong></div></td>
-<td>${phoneCell(c)}</td>
-<td>${c.fonction||'—'}</td>
-<td>${c.email||'—'}</td>
-<td><span class="status-pill ${c.actif===false?'inactive':'active'}"><span>●</span>${c.actif===false?'Inactif':'Actif'}</span></td>
-<td><div class="row-actions">
-<button class="icon-btn icon-btn-sm" data-edit-user="${c.id}">${icon('edit','icon-sm')}</button>
-<button class="icon-btn icon-btn-sm" data-toggle-user="${c.id}">${icon(c.actif===false?'check':'x','icon-sm')}</button>
-<button class="icon-btn icon-btn-sm danger" data-del-user="${c.id}">${icon('trash','icon-sm')}</button>
-</div></td>
-</tr>`).join('')}
-</tbody>
-</table>
-` : `<div class="empty-state">${icon('usersBadge','icon')}<div class="t">Aucun coordinateur pour l'instant</div><div class="d">Ajoutez le premier coordinateur pour qu'il puisse à son tour inviter des membres.</div></div>`}
-</div>`;
-}
-function viewUtilisateurs(){
-const u=currentUser();
-if(!isSuperAdmin(u)){
-return `<div class="empty-state"><div class="t">Accès réservé au super administrateur</div></div>`;
+return `<div class="empty-state"><div class="t">Accès réservé à l'administrateur</div><div class="d">La gestion des membres est réservée à l'administrateur.</div></div>`;
 }
 const list=[...DB.users].sort((a,b)=>(a.role>b.role?1:-1));
 return `
 <div class="page-head">
-<div><h1>Tous les utilisateurs</h1><div class="sub">Vue d'ensemble : super administrateurs, coordinateurs et membres. Vous pouvez modifier, désactiver ou supprimer n'importe quel compte (sauf le vôtre).</div></div>
+<div>
+<h1>Membres</h1>
+<div class="sub">${list.length} compte${list.length>1?'s':''}. Désignez des coordinateurs parmi les membres pour la validation des comptes rendus.</div>
+</div>
+<button class="btn btn-primary" id="addMembreBtn">${icon('plus')} Ajouter un membre</button>
 </div>
 <div class="card card-pad">
+${list.length ? `
 <table class="tasks-table">
-<thead><tr><th>Utilisateur</th><th>Téléphone</th><th>Rôle</th><th>Fonction</th><th>E-mail</th><th>Statut</th><th></th></tr></thead>
+<thead><tr><th>Membre</th><th>Téléphone</th><th>Fonction</th><th>E-mail</th><th>Rôle</th><th>Statut</th><th></th></tr></thead>
 <tbody>
 ${list.map(m=>`
 <tr>
 <td><div class="resp-name-cell"><div class="resp-avatar" style="background:${colorFor(m.id)}">${initials(m.name)}</div><strong>${m.name}</strong>${m.id===u.id?' <span class="hint">(vous)</span>':''}</div></td>
 <td>${phoneCell(m)}</td>
-<td><span class="badge ${m.role==='super_admin'?'badge-red':m.role==='coordinateur'?'badge-green':'badge-gray'}">${m.role==='super_admin'?'Super admin':m.role==='coordinateur'?'Coordinateur':'Membre'}</span></td>
 <td>${m.fonction||'—'}</td>
 <td>${m.email||'—'}</td>
+<td><span class="badge ${m.role==='super_admin'?'badge-red':m.role==='coordinateur'?'badge-green':'badge-gray'}">${m.role==='super_admin'?'Admin':m.role==='coordinateur'?'Coordinateur':'Membre'}</span></td>
 <td><span class="status-pill ${m.actif===false?'inactive':'active'}"><span>●</span>${m.actif===false?'Inactif':'Actif'}</span></td>
-<td>${m.id===u.id ? '' : `<div class="row-actions">
+<td>${m.id===u.id || m.role==='super_admin' ? '' : `<div class="row-actions">
 <button class="icon-btn icon-btn-sm" data-edit-user="${m.id}" title="Modifier">${icon('edit','icon-sm')}</button>
+<button class="icon-btn icon-btn-sm ${m.role==='coordinateur'?'success':''}" data-toggle-role="${m.id}" title="${m.role==='coordinateur'?'Retirer coordinateur':'Désigner coordinateur'}">${icon('userBadge','icon-sm')}</button>
 <button class="icon-btn icon-btn-sm" data-toggle-user="${m.id}" title="${m.actif===false?'Réactiver':'Désactiver'}">${icon(m.actif===false?'check':'x','icon-sm')}</button>
 <button class="icon-btn icon-btn-sm danger" data-del-user="${m.id}" title="Supprimer">${icon('trash','icon-sm')}</button>
 </div>`}</td>
 </tr>`).join('')}
 </tbody>
 </table>
+` : `<div class="empty-state">${icon('usersBadge','icon')}<div class="t">Aucun membre pour l'instant</div><div class="d">Cliquez sur « Ajouter un membre » pour créer le premier compte.</div></div>`}
 </div>`;
 }
-async function callAdminManageUser(payload){
+async function callManageMember(payload){
 const {data:{session}} = await sb.auth.getSession();
-const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-manage-user`,{
+const res = await fetch(`${SUPABASE_URL}/functions/v1/manage-member`,{
 method:'POST',
 headers:{
 'Content-Type':'application/json',
@@ -1961,67 +1521,169 @@ const json=await res.json();
 if(!res.ok){ toast(json.error||"Action impossible."); return null; }
 return json;
 }
+function openInviteModal() {
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+
+  const coordinateurs = DB.users.filter(x=>x.role==='coordinateur');
+
+  overlay.innerHTML = `
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3>Ajouter un membre</h3>
+        <button class="icon-btn" id="membreClose" type="button">${icon('x', 'icon-sm')}</button>
+      </div>
+      <div class="modal-body">
+        <div class="field"><label>Nom complet <span style="color:var(--red-600)">*</span></label>
+        <input type="text" id="membre-name" placeholder="Ex : Fatou Sarr" autocomplete="name" autofocus></div>
+        <div class="field"><label>Fonction</label>
+        <input type="text" id="membre-fonction" placeholder="Ex : Animatrice terrain" autocomplete="organization-title"></div>
+        <div class="field"><label>Téléphone <span style="color:var(--red-600)">*</span></label>
+        <input type="tel" id="membre-phone" placeholder="Ex : +221 77 123 45 67" autocomplete="tel"></div>
+        <div class="field"><label>E-mail <span style="color:var(--red-600)">*</span></label>
+        <input type="email" id="membre-email" placeholder="nom@entreprise.sn" autocomplete="email"></div>
+        <div class="field"><label>Rôle</label>
+        <select id="membre-role">
+          <option value="membre">Membre</option>
+          <option value="coordinateur">Coordinateur</option>
+        </select></div>
+        <div class="field" id="membre-coord-field"><label>Coordinateur rattaché <span class="hint">facultatif</span></label>
+        <select id="membre-coordinateur">
+          <option value="">— Aucun —</option>
+          ${coordinateurs.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}
+        </select></div>
+        <div class="hint">La personne recevra un lien d'activation à transmettre par WhatsApp.</div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-outline" id="membreCancel" type="button">Annuler</button>
+        <button class="btn btn-primary" id="membreSave" type="button">${icon('mail')} Créer le compte</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  overlay.querySelector('#membreClose').onclick = close;
+  overlay.querySelector('#membreCancel').onclick = close;
+
+  const roleSelect = overlay.querySelector('#membre-role');
+  const coordField = overlay.querySelector('#membre-coord-field');
+  const syncCoordField = () => { coordField.style.display = roleSelect.value==='coordinateur' ? 'none' : ''; };
+  roleSelect.onchange = syncCoordField;
+  syncCoordField();
+
+  overlay.querySelector('#membreSave').onclick = async () => {
+
+    const name = overlay.querySelector('#membre-name').value.trim();
+    const email = overlay.querySelector('#membre-email').value.trim().toLowerCase();
+    const fonction = overlay.querySelector('#membre-fonction').value.trim();
+    const phone = overlay.querySelector('#membre-phone').value.trim();
+    const role = overlay.querySelector('#membre-role').value;
+    const coordinateurId = overlay.querySelector('#membre-coordinateur').value;
+
+    if (!name || !email || !phone) {
+      toast('Le nom, le téléphone et l’e-mail sont obligatoires.');
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      toast('Veuillez saisir une adresse e-mail valide.');
+      return;
+    }
+    const phoneNorm = normalizePhoneSN(phone);
+    if (!phoneNorm || phoneNorm.length !== 12) {
+      toast('Numéro de téléphone invalide. Format attendu : +221 77 123 45 67.');
+      return;
+    }
+
+    const saveBtn = overlay.querySelector('#membreSave');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Création…';
+
+    const result = await callManageMember({
+      action: 'invite',
+      name, email, phone, fonction, role,
+      coordinateurId: role==='membre' ? (coordinateurId || null) : null,
+      redirectTo: window.location.origin + window.location.pathname,
+    });
+
+    if (!result) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = `${icon('mail')} Créer le compte`;
+      return;
+    }
+
+    toast(`Compte créé pour ${email}.`);
+    if (result.whatsappUrl) { window.open(result.whatsappUrl, '_blank'); }
+    close();
+    await loadProfiles();
+    render();
+  };
+}
 function openUserEditModal(target){
 const overlay=document.createElement('div'); overlay.className='modal-overlay';
-const u=currentUser();
-const canChangeRole = isSuperAdmin(u) && target.role!=='super_admin';
+const coordinateurs = DB.users.filter(x=>x.role==='coordinateur' && x.id!==target.id);
 overlay.innerHTML=`<div class="modal-card"><div class="modal-head"><h3>Modifier ${target.name}</h3><button class="icon-btn" id="uedClose">${icon('x','icon-sm')}</button></div><div class="modal-body">
-<div class="field"><label>Nom complet</label><input type="text" id="ued-name" value="${target.name.replace(/"/g,'"')}"></div>
-<div class="field"><label>Fonction</label><input type="text" id="ued-fonction" value="${(target.fonction||'').replace(/"/g,'"')}"></div>
-${canChangeRole?`<div class="field"><label>Rôle</label><select id="ued-role">
-<option value="coordinateur" ${target.role==='coordinateur'?'selected':''}>Coordinateur</option>
+<div class="field"><label>Nom complet</label><input type="text" id="ued-name" value="${target.name.replace(/"/g,'&quot;')}"></div>
+<div class="field"><label>Fonction</label><input type="text" id="ued-fonction" value="${(target.fonction||'').replace(/"/g,'&quot;')}"></div>
+<div class="field"><label>Téléphone</label><input type="tel" id="ued-phone" value="${(target.phone||'').replace(/"/g,'&quot;')}" placeholder="+221 77 123 45 67"></div>
+<div class="field"><label>Rôle</label><select id="ued-role">
 <option value="membre" ${target.role==='membre'?'selected':''}>Membre</option>
-</select></div>`:''}
+<option value="coordinateur" ${target.role==='coordinateur'?'selected':''}>Coordinateur</option>
+</select></div>
+<div class="field" id="ued-coord-field"><label>Coordinateur rattaché</label><select id="ued-coordinateur">
+<option value="">— Aucun —</option>
+${coordinateurs.map(c=>`<option value="${c.id}" ${target.coordinateurId===c.id?'selected':''}>${c.name}</option>`).join('')}
+</select></div>
 </div><div class="modal-foot"><button class="btn btn-outline" id="uedCancel">Annuler</button><button class="btn btn-primary" id="uedSave">${icon('check')} Enregistrer</button></div></div>`;
 document.body.appendChild(overlay);
 const close=()=>overlay.remove();
 overlay.querySelector('#uedClose').onclick=close;
 overlay.querySelector('#uedCancel').onclick=close;
+const roleSelect=overlay.querySelector('#ued-role');
+const coordField=overlay.querySelector('#ued-coord-field');
+const syncCoordField=()=>{ coordField.style.display = roleSelect.value==='coordinateur' ? 'none' : ''; };
+roleSelect.onchange=syncCoordField;
+syncCoordField();
 overlay.querySelector('#uedSave').onclick=async()=>{
 const payload={
-action:'update', targetId:target.id,
+action:'update', userId:target.id,
 name:overlay.querySelector('#ued-name').value.trim(),
 fonction:overlay.querySelector('#ued-fonction').value.trim(),
+phone:overlay.querySelector('#ued-phone').value.trim(),
+role:overlay.querySelector('#ued-role').value,
+coordinateurId: overlay.querySelector('#ued-coordinateur').value || '',
 };
-if(canChangeRole) payload.newRole=overlay.querySelector('#ued-role').value;
-const r=await callAdminManageUser(payload);
+const r=await callManageMember(payload);
 if(r){ toast('Compte mis à jour.'); close(); await loadProfiles(); render(); }
 };
 }
-function wireUserAdminActions(){
+function wireMembres(){
+const u=currentUser();
+if(!isSuperAdmin(u)) return;
+const addBtn=document.getElementById('addMembreBtn');
+if(addBtn) addBtn.onclick=()=>openInviteModal();
 document.querySelectorAll('[data-edit-user]').forEach(b=>b.onclick=()=>{
 const t=DB.users.find(x=>x.id===b.dataset.editUser); if(t) openUserEditModal(t);
 });
+document.querySelectorAll('[data-toggle-role]').forEach(b=>b.onclick=async()=>{
+const t=DB.users.find(x=>x.id===b.dataset.toggleRole); if(!t) return;
+const newRole = t.role==='coordinateur' ? 'membre' : 'coordinateur';
+const r=await callManageMember({action:'update', userId:t.id, name:t.name, fonction:t.fonction, role:newRole, coordinateurId:''});
+if(r){ toast(newRole==='coordinateur'?`${t.name} est désormais coordinateur.`:`${t.name} n'est plus coordinateur.`); await loadProfiles(); render(); }
+});
 document.querySelectorAll('[data-toggle-user]').forEach(b=>b.onclick=async()=>{
 const t=DB.users.find(x=>x.id===b.dataset.toggleUser); if(!t) return;
-const r=await callAdminManageUser({action:'toggle_active', targetId:t.id});
+const r=await callManageMember({action:'toggle_active', userId:t.id});
 if(r){ toast(r.actif?`${t.name} réactivé.`:`${t.name} désactivé.`); await loadProfiles(); render(); }
 });
 document.querySelectorAll('[data-del-user]').forEach(b=>b.onclick=async()=>{
 const t=DB.users.find(x=>x.id===b.dataset.delUser); if(!t) return;
 if(!confirm(`Supprimer définitivement le compte de ${t.name} ?`)) return;
-const r=await callAdminManageUser({action:'delete', targetId:t.id});
+const r=await callManageMember({action:'delete', userId:t.id});
 if(r){ toast('Compte supprimé.'); await loadProfiles(); render(); }
 });
-}
-function wireCoordinateurs(){
-const u=currentUser();
-if(!isSuperAdmin(u)) return;
-wireUserAdminActions();
-const addBtn=document.getElementById('addCoordBtn');
-if(!addBtn) return;
-addBtn.onclick=()=>openInviteModal('coordinateur');
-}
-function wireUtilisateurs(){
-const u=currentUser();
-if(!isSuperAdmin(u)) return;
-wireUserAdminActions();
-}
-function wireMembres(){
-const u=currentUser();
-if(!isCoordOrAbove(u)) return;
-const addBtn=document.getElementById('addMembreBtn');
-if(addBtn) addBtn.onclick=()=>openInviteModal('membre');
 }
 function viewNewReport(){
 return `
@@ -2266,8 +1928,6 @@ else if(state.view==='new-report') c.innerHTML=viewNewReport();
 else if(state.view==='tasks') c.innerHTML=viewTasks();
 else if(state.view==='responsables'){ c.innerHTML=viewResponsables(); wireResponsables(); }
 else if(state.view==='membres'){ c.innerHTML=viewMembres(); wireMembres(); }
-else if(state.view==='coordinateurs'){ c.innerHTML=viewCoordinateurs(); wireCoordinateurs(); }
-else if(state.view==='utilisateurs'){ c.innerHTML=viewUtilisateurs(); wireUtilisateurs(); }
 c.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>setView(b.dataset.nav));
 c.querySelectorAll('[data-goto-report]').forEach(b=>b.onclick=()=>setView('report-detail',{activeReportId:b.dataset.gotoReport}));
 c.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{state.reportFilter=b.dataset.filter;renderContent();});
