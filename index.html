@@ -565,6 +565,7 @@ photos:r.photos||[], resultats:r.resultats||[],
 pointsForts:r.points_forts||[], difficultes:r.difficultes||[],
 recommandations:r.recommandations||[], comments:r.comments||[],
 submittedTo:r.submitted_to, isShared:!!r.is_shared, shareToken:r.share_token, sharedAt:r.shared_at,
+customSections:r.custom_sections||[],
 });
 const mapReportToDb = r => ({
 id:r.id, title:r.title, project:r.project,
@@ -579,6 +580,7 @@ photos:r.photos||[], resultats:r.resultats||[],
 points_forts:r.pointsForts||[], difficultes:r.difficultes||[],
 recommandations:r.recommandations||[], comments:r.comments||[],
 submitted_to:r.submittedTo||null, is_shared:!!r.isShared, share_token:r.shareToken||null, shared_at:r.sharedAt||null,
+custom_sections:r.customSections||[],
 });
 const mapTaskFromDb = t => ({id:t.id, title:t.title, project:t.project, location:t.location, assignedTo:t.assigned_to, dueDate:t.due_date, status:t.status, priority:t.priority});
 const mapTaskToDb = t => ({id:t.id, title:t.title, project:t.project||null, location:t.location||null, assigned_to:t.assignedTo, due_date:t.dueDate, status:t.status, priority:t.priority});
@@ -681,6 +683,7 @@ let pendingPasswordSetup = false;
 function currentUser(){return userById(state.currentUserId);}
 function setView(view,params={}){
 state.view=view;
+state.editingReportId=null;
 Object.assign(state,params);
 window.scrollTo(0,0);
 render();
@@ -758,7 +761,7 @@ mapNotifToDb(n)
 async function notifyCoordinators(report){
 const author=userById(report.createdBy);
 const recipients=DB.users.filter(
-u=>u.role==='coordinateur' || u.role==='super_admin'
+u=>u.id===report.submittedTo || u.role==='super_admin'
 );
 const newNotifs=recipients.map(u=>({
 id:uid('n'),
@@ -1088,9 +1091,10 @@ if(!r) return `<div class="empty-state">Compte rendu introuvable.</div>`;
 const u=currentUser();
 const resp=userById(r.responsibleId);
 const author=userById(r.createdBy);
-const canValidate = isCoordOrAbove(u) && r.status==='en_attente';
+const canValidate = r.status==='en_attente' && (isSuperAdmin(u) || (u.role==='coordinateur' && r.submittedTo===u.id));
 const canComment = r.status==='publie';
-const canEdit = r.status==='brouillon' && r.createdBy===u.id;
+const canEdit = isSuperAdmin(u) || r.createdBy===u.id || (isCoordOrAbove(u) && (r.submittedTo===u.id || !r.submittedTo));
+const canDelete = isSuperAdmin(u) || (isCoordOrAbove(u) && (r.submittedTo===u.id || !r.submittedTo)) || (r.createdBy===u.id && r.status==='brouillon');
 return `
 ${r.status==='en_attente'?`
 <div class="validate-bar">
@@ -1105,7 +1109,6 @@ ${canValidate?`
 ${r.status==='brouillon'?`
 <div class="validate-bar" style="background:var(--line-soft);border-color:var(--line);">
 <div class="vb-text" style="color:var(--ink-600)">${icon('edit')} Ce compte rendu est encore à l'état de brouillon.</div>
-${canEdit?`<button class="btn btn-primary btn-sm" data-edit-report="${r.id}">${icon('edit','icon-sm')} Continuer la rédaction</button>`:''}
 </div>
 `:''}
 <div class="detail-head">
@@ -1119,8 +1122,10 @@ ${canEdit?`<button class="btn btn-primary btn-sm" data-edit-report="${r.id}">${i
 </div>
 <div class="detail-actions">
 ${statusBadge(r.status)}
+${canEdit ? `<button class="btn btn-outline btn-sm" data-edit-report="${r.id}">${icon('edit','icon-sm')} Modifier</button>` : ''}
 ${r.status==='publie' && isCoordOrAbove(u) ? `<button class="btn btn-primary btn-sm" id="shareReportBtn">${icon('send','icon-sm')} ${r.isShared?'Copier le lien':'Partager'}</button>` : ''}
 <button class="btn btn-yellow" onclick="window.print()">${icon('print')} Imprimer</button>
+${canDelete ? `<button class="btn btn-danger-outline btn-sm" id="deleteReportBtn">${icon('trash','icon-sm')} Supprimer</button>` : ''}
 </div>
 </div>
 <div class="meta-grid">
@@ -1172,6 +1177,14 @@ ${r.status==='publie' && isCoordOrAbove(u) ? `<button class="btn btn-primary btn
 <ul>${(r.recommandations||[]).filter(Boolean).map(x=>`<li>${x}</li>`).join('')||'<li>—</li>'}</ul>
 </div>
 </div>
+${(r.customSections||[]).length ? `
+<div class="card card-pad">
+<div class="section-title"><div class="ic" style="background:var(--blue-50)">${icon('file','icon-sm',getComputedStyle(document.documentElement).getPropertyValue('--blue-700'))}</div><h3>Plan personnalisé du rédacteur</h3></div>
+${r.customSections.map(s=>`
+<div class="sub-h">${s.title}</div>
+<p class="body-text" style="margin-bottom:14px;">${(s.content||'—').replace(/\n/g,'<br>')}</p>
+`).join('')}
+</div>` : ''}
 <div class="card card-pad">
 <div class="section-title"><div class="ic" style="background:var(--blue-50)">${icon('comment','icon-sm',getComputedStyle(document.documentElement).getPropertyValue('--blue-700'))}</div><h3>Commentaires ${r.comments.length?`(${r.comments.length})`:''}</h3></div>
 ${r.comments.length? r.comments.map(c=>{
@@ -1696,11 +1709,12 @@ if(r){ toast('Compte supprimé.'); await loadProfiles(); render(); }
 });
 }
 function viewNewReport(){
+const editing = DB.reports.find(x=>x.id===state.editingReportId);
 return `
 <div class="page-head">
 <div>
-<h1>Nouveau compte rendu</h1>
-<div class="sub">Remplissez le modèle ci-dessous, puis envoyez-le au coordinateur pour validation.</div>
+<h1>${editing?'Modifier le compte rendu':'Nouveau compte rendu'}</h1>
+<div class="sub">${editing?'Modifiez les informations, le plan ou les photos, puis enregistrez.':'Remplissez le modèle ci-dessous, puis envoyez-le au coordinateur pour validation.'}</div>
 </div>
 </div>
 <div class="form-shell">
@@ -1721,6 +1735,10 @@ return `
 <div class="field"><label>Bénéficiaires</label><input type="text" id="f-beneficiaries" placeholder="Ex : 50 femmes"></div>
 <div class="field"><label>Responsable de la mission</label>
 ${DB.responsables.some(r=>r.actif!==false) ? `<select id="f-responsible"><option value="">— Sélectionner un responsable —</option>${DB.responsables.filter(r=>r.actif!==false).map(r=>`<option value="${r.id}">${r.name}${r.fonction?` — ${r.fonction}`:''}</option>`).join('')}</select>` : `<div style="padding:11px 12px;border:1px dashed var(--amber-100);background:var(--amber-50);border-radius:9px;color:var(--amber-700);font-size:12.8px;line-height:1.5;">Aucun responsable actif n'est disponible. Le coordinateur doit d'abord compléter ou réactiver la liste dans <strong>Administration → Responsables</strong>.</div>`}
+</div>
+</div>
+<div class="field"><label>Envoyer à un coordinateur</label>
+${DB.users.some(x=>x.role==='coordinateur' && x.actif!==false) ? `<select id="f-coordinateur"><option value="">— Sélectionner un coordinateur —</option>${DB.users.filter(x=>x.role==='coordinateur' && x.actif!==false).map(c=>`<option value="${c.id}">${c.name}${c.fonction?` — ${c.fonction}`:''}</option>`).join('')}</select>` : `<div style="padding:11px 12px;border:1px dashed var(--amber-100);background:var(--amber-50);border-radius:9px;color:var(--amber-700);font-size:12.8px;line-height:1.5;">Aucun coordinateur actif n'est disponible. Contactez l'administrateur.</div>`}
 </div>
 </div>
 </div>
@@ -1766,6 +1784,12 @@ ${icon('image','icon',getComputedStyle(document.documentElement).getPropertyValu
 <button class="add-link" id="addResult">${icon('plus')} Ajouter un indicateur</button>
 </div>
 <div class="card card-pad">
+<div class="section-title"><div class="ic" style="background:var(--blue-50)">${icon('file','icon-sm',getComputedStyle(document.documentElement).getPropertyValue('--blue-700'))}</div><h3>Plan personnalisé</h3></div>
+<p style="font-size:12.3px;color:var(--ink-600);margin-bottom:10px;">Créez vos propres sections avec le titre de votre choix (ex : "Objectifs", "Enseignements", "Suivi"…).</p>
+<div id="customSectionsList"></div>
+<button class="add-link" id="addCustomSection">${icon('plus')} Ajouter une section</button>
+</div>
+<div class="card card-pad">
 <div class="section-title"><div class="ic" style="background:var(--green-50)">${icon('arrowDown','icon-sm','#006B34')}</div><h3>Points forts</h3></div>
 <div class="dyn-list" id="strengthsList"></div>
 <button class="add-link" id="addStrength">${icon('plus')} Ajouter</button>
@@ -1785,10 +1809,15 @@ ${icon('image','icon',getComputedStyle(document.documentElement).getPropertyValu
 <div class="card card-pad">
 <div class="section-title"><div class="ic" style="background:var(--blue-50)">${icon('send','icon-sm',getComputedStyle(document.documentElement).getPropertyValue('--blue-700'))}</div><h3>Publication</h3></div>
 <p style="font-size:12.6px;color:var(--ink-600);line-height:1.6;margin-bottom:14px;">
-Envoyez ce compte rendu au coordinateur pour validation. Une fois validé, il sera automatiquement partagé par e-mail à toute l'équipe, avec un lien direct pour le consulter et le commenter.
+${editing?'Enregistrez vos modifications — ajoutez, retirez ou remplacez des photos, complétez votre plan personnalisé.':'Envoyez ce compte rendu au coordinateur pour validation. Une fois validé, il sera automatiquement partagé par e-mail à toute l\'équipe, avec un lien direct pour le consulter et le commenter.'}
 </p>
+${editing? `
+<button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:9px;" id="saveEditBtn">${icon('check')} Enregistrer les modifications</button>
+<button class="btn btn-outline" style="width:100%;justify-content:center;" id="cancelEditBtn">Annuler</button>
+` : `
 <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:9px;" id="submitReportBtn">${icon('send')} Envoyer au coordinateur</button>
 <button class="btn btn-outline" style="width:100%;justify-content:center;" id="draftReportBtn">${icon('edit')} Enregistrer en brouillon</button>
+`}
 </div>
 <div class="card card-pad">
 <div class="section-title"><h3 style="font-size:13.5px">Circuit de validation</h3></div>
@@ -1849,9 +1878,55 @@ tr.querySelector('.rm-btn').onclick=()=>{ if(tbody.children.length>1) tr.remove(
 tbody.appendChild(tr);
 updateTaux();
 }
+function makeCustomSectionRow(container,title='',content=''){
+const row=document.createElement('div');
+row.className='card-pad';
+row.style.cssText='border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;background:var(--bg);';
+row.innerHTML=`
+<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+<input type="text" class="cs-title" placeholder="Titre de la section (ex : Objectifs, Enseignements…)" value="${title.replace(/"/g,'&quot;')}" style="flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;font-weight:600;">
+<button type="button" class="rm-btn cs-rm">${icon('trash','icon-sm')}</button>
+</div>
+<textarea class="cs-content" placeholder="Contenu de cette section…" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:13px;min-height:70px;resize:vertical;">${content}</textarea>
+`;
+row.querySelector('.cs-rm').onclick=()=>row.remove();
+container.appendChild(row);
+}
+function getCustomSectionsValues(container){
+return [...container.children].map(row=>({
+title:row.querySelector('.cs-title').value.trim(),
+content:row.querySelector('.cs-content').value.trim(),
+})).filter(s=>s.title || s.content);
+}
 function wireNewReportForm(){
-photoStore=[];
+const editing = DB.reports.find(x=>x.id===state.editingReportId);
+photoStore = editing ? editing.photos.map(p=>({url:p.url,caption:p.caption||''})) : [];
 ['objList','stepList','strengthsList','issuesList','recsList'].forEach(id=>document.getElementById(id).innerHTML='');
+document.getElementById('customSectionsList').innerHTML='';
+if(editing){
+document.getElementById('f-title').value=editing.title||'';
+document.getElementById('f-project').value=editing.project||'';
+document.getElementById('f-start').value=editing.periodStart||'';
+document.getElementById('f-end').value=editing.periodEnd||'';
+document.getElementById('f-location').value=editing.location||'';
+document.getElementById('f-region').value=editing.region||'';
+document.getElementById('f-beneficiaries').value=editing.beneficiaries||'';
+if(document.getElementById('f-responsible')) document.getElementById('f-responsible').value=editing.responsibleId||'';
+if(document.getElementById('f-coordinateur')) document.getElementById('f-coordinateur').value=editing.submittedTo||'';
+document.getElementById('f-contexte').value=editing.contexte||'';
+document.getElementById('f-objgen').value=editing.objectifGeneral||'';
+document.getElementById('f-dates').value=editing.dateHoraires||'';
+document.getElementById('f-methodes').value=editing.methodes||'';
+document.getElementById('f-moyens').value=editing.moyens||'';
+(editing.objectifsSpecifiques&&editing.objectifsSpecifiques.length?editing.objectifsSpecifiques:['']).forEach(v=>makeDynRow(document.getElementById('objList'),'Ex : Renforcer les compétences des bénéficiaires',v));
+(editing.etapes&&editing.etapes.length?editing.etapes:['']).forEach(v=>makeDynRow(document.getElementById('stepList'),'Ex : Formation pratique sur les techniques agricoles',v));
+(editing.pointsForts&&editing.pointsForts.length?editing.pointsForts:['']).forEach(v=>makeDynRow(document.getElementById('strengthsList'),'Ex : Bonne participation des bénéficiaires',v));
+(editing.difficultes&&editing.difficultes.length?editing.difficultes:['']).forEach(v=>makeDynRow(document.getElementById('issuesList'),'Ex : Accès difficile à certaines parcelles',v));
+(editing.recommandations&&editing.recommandations.length?editing.recommandations:['']).forEach(v=>makeDynRow(document.getElementById('recsList'),'Ex : Renforcer l\'appui matériel',v));
+(editing.customSections||[]).forEach(s=>makeCustomSectionRow(document.getElementById('customSectionsList'),s.title,s.content));
+document.getElementById('resultsBody').innerHTML='';
+if(editing.resultats && editing.resultats.length){ editing.resultats.forEach(row=>addResultRow(row)); } else { addResultRow(); }
+}else{
 makeDynRow(document.getElementById('objList'),'Ex : Renforcer les compétences des bénéficiaires');
 makeDynRow(document.getElementById('stepList'),'Ex : Formation pratique sur les techniques agricoles');
 makeDynRow(document.getElementById('strengthsList'),'Ex : Bonne participation des bénéficiaires');
@@ -1859,6 +1934,7 @@ makeDynRow(document.getElementById('issuesList'),'Ex : Accès difficile à certa
 makeDynRow(document.getElementById('recsList'),'Ex : Renforcer l\'appui matériel');
 document.getElementById('resultsBody').innerHTML='';
 addResultRow();
+}
 renderPhotoThumbs();
 document.getElementById('addObj').onclick=()=>makeDynRow(document.getElementById('objList'),'Objectif spécifique…');
 document.getElementById('addStep').onclick=()=>makeDynRow(document.getElementById('stepList'),'Étape réalisée…');
@@ -1866,6 +1942,7 @@ document.getElementById('addStrength').onclick=()=>makeDynRow(document.getElemen
 document.getElementById('addIssue').onclick=()=>makeDynRow(document.getElementById('issuesList'),'Difficulté rencontrée…');
 document.getElementById('addRec').onclick=()=>makeDynRow(document.getElementById('recsList'),'Recommandation…');
 document.getElementById('addResult').onclick=()=>addResultRow();
+document.getElementById('addCustomSection').onclick=()=>makeCustomSectionRow(document.getElementById('customSectionsList'));
 document.getElementById('photoInput').onchange=(e)=>{
 [...e.target.files].forEach(file=>{
 const reader=new FileReader();
@@ -1882,7 +1959,7 @@ prevision:tr.querySelector('.res-prev').value?parseFloat(tr.querySelector('.res-
 realisation:tr.querySelector('.res-real').value?parseFloat(tr.querySelector('.res-real').value):0,
 })).filter(r=>r.indicateur);
 return {
-id:uid('r'),
+id:editing?editing.id:uid('r'),
 title,
 project:document.getElementById('f-project').value.trim()||'—',
 periodStart:document.getElementById('f-start').value||new Date().toISOString().slice(0,10),
@@ -1892,8 +1969,8 @@ region:document.getElementById('f-region').value.trim()||'',
 beneficiaries:document.getElementById('f-beneficiaries').value.trim()||'—',
 responsibleId:document.getElementById('f-responsible')?.value||'',
 status,
-createdBy:state.currentUserId,
-createdAt:Date.now(),
+createdBy:editing?editing.createdBy:state.currentUserId,
+createdAt:editing?editing.createdAt:Date.now(),
 contexte:document.getElementById('f-contexte').value.trim(),
 objectifGeneral:document.getElementById('f-objgen').value.trim(),
 objectifsSpecifiques:getDynValues(document.getElementById('objList')),
@@ -1906,12 +1983,32 @@ resultats:results,
 pointsForts:getDynValues(document.getElementById('strengthsList')),
 difficultes:getDynValues(document.getElementById('issuesList')),
 recommandations:getDynValues(document.getElementById('recsList')),
-comments:[],
+comments:editing?editing.comments:[],
+customSections:getCustomSectionsValues(document.getElementById('customSectionsList')),
+submittedTo:document.getElementById('f-coordinateur')?.value || (editing?editing.submittedTo:null),
+isShared:editing?editing.isShared:false,
+shareToken:editing?editing.shareToken:null,
+sharedAt:editing?editing.sharedAt:null,
 };
 }
+if(editing){
+document.getElementById('saveEditBtn').onclick=()=>{
+const updated=collectReport(editing.status);
+Object.assign(editing, updated);
+toast('Compte rendu modifié.');
+sbUpdate('reports', mapReportToDb(editing), editing.id);
+state.editingReportId=null;
+setView('report-detail',{activeReportId:editing.id});
+};
+document.getElementById('cancelEditBtn').onclick=()=>{
+state.editingReportId=null;
+setView('report-detail',{activeReportId:editing.id});
+};
+}else{
 document.getElementById('submitReportBtn').onclick=()=>{
 if(!DB.responsables.some(r=>r.actif!==false)){toast('Aucun responsable actif n’est disponible. Le coordinateur doit d’abord compléter ou réactiver la liste.');return;}
 if(!document.getElementById('f-responsible')?.value){toast('Veuillez sélectionner un responsable de mission.');return;}
+if(!document.getElementById('f-coordinateur')?.value){toast('Veuillez sélectionner le coordinateur destinataire.');return;}
 const report=collectReport('en_attente');
 DB.reports.unshift(report);
 notifyCoordinators(report);
@@ -1929,6 +2026,7 @@ sbInsert('reports', mapReportToDb(report));
 setView('reports');
 };
 }
+}
 function renderContent(){
 const c=document.getElementById('content');
 if(state.view==='dashboard') c.innerHTML=viewDashboard();
@@ -1941,7 +2039,7 @@ else if(state.view==='membres'){ c.innerHTML=viewMembres(); wireMembres(); }
 c.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>setView(b.dataset.nav));
 c.querySelectorAll('[data-goto-report]').forEach(b=>b.onclick=()=>setView('report-detail',{activeReportId:b.dataset.gotoReport}));
 c.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{state.reportFilter=b.dataset.filter;renderContent();});
-c.querySelectorAll('[data-edit-report]').forEach(b=>b.onclick=()=>toast("L'édition de brouillon est disponible dans la version connectée à la base de données."));
+c.querySelectorAll('[data-edit-report]').forEach(b=>b.onclick=()=>setView('new-report',{editingReportId:b.dataset.editReport}));
 if(state.view==='new-report') wireNewReportForm();
 if(state.view==='tasks'){
 const addBtn=document.getElementById('addTaskBtn');
@@ -2053,6 +2151,16 @@ copyBtn.onclick=async()=>{
 const input=document.getElementById('shareLinkInput');
 try{ await navigator.clipboard.writeText(input.value); toast('Lien copié.'); }
 catch(e){ input.select(); document.execCommand('copy'); toast('Lien copié.'); }
+};
+}
+const deleteBtn=document.getElementById('deleteReportBtn');
+if(deleteBtn){
+deleteBtn.onclick=async()=>{
+if(!confirm(`Êtes-vous sûr de vouloir supprimer « ${r.title} » ? Cette action est définitive.`)) return;
+await sbDelete('reports', r.id);
+DB.reports=DB.reports.filter(x=>x.id!==r.id);
+toast('Compte rendu supprimé.');
+setView('reports');
 };
 }
 const postBtn=document.getElementById('postCommentBtn');
