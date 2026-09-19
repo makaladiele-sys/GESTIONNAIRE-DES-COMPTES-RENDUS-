@@ -1624,6 +1624,10 @@ function openInviteModal() {
     saveBtn.disabled = true;
     saveBtn.textContent = 'Création…';
 
+    // Ouvrir l'onglet tout de suite, pendant que le clic est encore "actif",
+    // pour éviter que le navigateur bloque l'ouverture après l'attente réseau.
+    const waWindow = window.open('', '_blank');
+
     const result = await callManageMember({
       action: 'invite',
       name, email, phone, fonction, role,
@@ -1632,13 +1636,27 @@ function openInviteModal() {
     });
 
     if (!result) {
+      if (waWindow) waWindow.close();
       saveBtn.disabled = false;
       saveBtn.innerHTML = `${icon('mail')} Créer le compte`;
       return;
     }
 
     toast(`Compte créé pour ${email}.`);
-    if (result.whatsappUrl) { window.open(result.whatsappUrl, '_blank'); }
+
+    if (result.whatsappUrl) {
+      if (waWindow) {
+        waWindow.location.href = result.whatsappUrl;
+      } else {
+        const fallback = document.createElement('div');
+        fallback.className = 'toast';
+        fallback.style.background = '#25D366';
+        fallback.innerHTML = `<a href="${result.whatsappUrl}" target="_blank" rel="noopener" style="color:#fff;font-weight:600;">${icon('whatsapp','icon-sm')} Ouvrir WhatsApp pour ${name}</a>`;
+        document.getElementById('toastWrap').appendChild(fallback);
+        setTimeout(()=>{fallback.style.opacity='0';fallback.style.transition='opacity .3s';setTimeout(()=>fallback.remove(),300);},12000);
+      }
+    }
+
     close();
     await loadProfiles();
     render();
