@@ -502,6 +502,7 @@ animation:modalIn .18s ease;
 <div id="authScreen" style="display: none;"></div>
 <script>
 const initialAuthHash = window.location.hash;
+const initialReportId = new URLSearchParams(window.location.search).get('report');
 const ICONS = {
 home:`<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>`,
 file:`<path d="M6 2h8l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z"/><path d="M14 2v4h4"/>`,
@@ -563,6 +564,7 @@ etapes:r.etapes||[], methodes:r.methodes, moyens:r.moyens,
 photos:r.photos||[], resultats:r.resultats||[],
 pointsForts:r.points_forts||[], difficultes:r.difficultes||[],
 recommandations:r.recommandations||[], comments:r.comments||[],
+submittedTo:r.submitted_to, isShared:!!r.is_shared, shareToken:r.share_token, sharedAt:r.shared_at,
 });
 const mapReportToDb = r => ({
 id:r.id, title:r.title, project:r.project,
@@ -576,6 +578,7 @@ etapes:r.etapes||[], methodes:r.methodes||null, moyens:r.moyens||null,
 photos:r.photos||[], resultats:r.resultats||[],
 points_forts:r.pointsForts||[], difficultes:r.difficultes||[],
 recommandations:r.recommandations||[], comments:r.comments||[],
+submitted_to:r.submittedTo||null, is_shared:!!r.isShared, share_token:r.shareToken||null, shared_at:r.sharedAt||null,
 });
 const mapTaskFromDb = t => ({id:t.id, title:t.title, project:t.project, location:t.location, assignedTo:t.assigned_to, dueDate:t.due_date, status:t.status, priority:t.priority});
 const mapTaskToDb = t => ({id:t.id, title:t.title, project:t.project||null, location:t.location||null, assigned_to:t.assignedTo, due_date:t.dueDate, status:t.status, priority:t.priority});
@@ -1116,6 +1119,7 @@ ${canEdit?`<button class="btn btn-primary btn-sm" data-edit-report="${r.id}">${i
 </div>
 <div class="detail-actions">
 ${statusBadge(r.status)}
+${r.status==='publie' && isCoordOrAbove(u) ? `<button class="btn btn-primary btn-sm" id="shareReportBtn">${icon('send','icon-sm')} ${r.isShared?'Copier le lien':'Partager'}</button>` : ''}
 <button class="btn btn-yellow" onclick="window.print()">${icon('print')} Imprimer</button>
 </div>
 </div>
@@ -1218,10 +1222,16 @@ return `<tr>
 </div>`:''}
 <div class="card card-pad">
 <div class="section-title"><div class="ic" style="background:var(--amber-50)">${icon('mail','icon-sm','#A81F20')}</div><h3>Diffusion</h3></div>
-${r.status==='publie'? `
-<p style="font-size:12.8px;color:var(--ink-600);line-height:1.6;">${icon('checkCircle','icon-sm')} Partagé par e-mail à ${DB.users.length-1} membre${DB.users.length-1>1?'s':''} de l'équipe le ${new Date(r.publishedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'long'})}.</p>
+${r.isShared? `
+<p style="font-size:12.8px;color:var(--ink-600);line-height:1.6;margin-bottom:10px;">${icon('checkCircle','icon-sm')} Lien de partage actif depuis le ${new Date(r.sharedAt).toLocaleDateString('fr-FR',{day:'numeric',month:'long'})}.</p>
+<div style="display:flex;gap:8px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:9px 11px;">
+<input type="text" readonly id="shareLinkInput" value="${window.location.origin}${window.location.pathname}?report=${r.id}" style="flex:1;border:none;background:none;font-size:11.5px;color:var(--ink-700);outline:none;">
+<button class="btn btn-outline btn-sm" id="copyShareLinkBtn">Copier</button>
+</div>
+` : r.status==='publie' ? `
+<p style="font-size:12.8px;color:var(--ink-600);line-height:1.6;">Ce compte rendu est validé. Cliquez sur « Partager » pour générer un lien à transmettre aux membres.</p>
 ` : r.status==='en_attente' ? `
-<p style="font-size:12.8px;color:var(--ink-600);line-height:1.6;">La diffusion par e-mail se déclenchera automatiquement après validation par le coordinateur.</p>
+<p style="font-size:12.8px;color:var(--ink-600);line-height:1.6;">Le lien de partage sera disponible après validation par le coordinateur.</p>
 ` : `
 <p style="font-size:12.8px;color:var(--ink-600);line-height:1.6;">Envoyez ce compte rendu au coordinateur pour lancer le circuit de validation et de diffusion.</p>
 `}
@@ -2020,6 +2030,31 @@ r.id
 setView('reports');
 };
 }
+const shareBtn=document.getElementById('shareReportBtn');
+if(shareBtn){
+shareBtn.onclick=async()=>{
+const link = `${window.location.origin}${window.location.pathname}?report=${r.id}`;
+if(!r.isShared){
+r.isShared=true;
+r.sharedAt=Date.now();
+if(!r.shareToken) r.shareToken=uid('share');
+await sbUpdate('reports', {is_shared:true, shared_at:r.sharedAt, share_token:r.shareToken}, r.id);
+toast('Lien de partage généré et copié.');
+}else{
+toast('Lien copié.');
+}
+try{ await navigator.clipboard.writeText(link); }catch(e){ console.warn('clipboard', e); }
+renderContent();
+};
+}
+const copyBtn=document.getElementById('copyShareLinkBtn');
+if(copyBtn){
+copyBtn.onclick=async()=>{
+const input=document.getElementById('shareLinkInput');
+try{ await navigator.clipboard.writeText(input.value); toast('Lien copié.'); }
+catch(e){ input.select(); document.execCommand('copy'); toast('Lien copié.'); }
+};
+}
 const postBtn=document.getElementById('postCommentBtn');
 if(postBtn){
 postBtn.onclick=()=>{
@@ -2106,7 +2141,11 @@ toast("Connexion à Supabase impossible.");
 }
 document.getElementById('authScreen').style.display='none';
 document.getElementById('shell').style.display='flex';
+if(initialReportId){
+setView('report-detail',{activeReportId:initialReportId});
+}else{
 render();
+}
 }
 (function init(){
 if(!sb){
