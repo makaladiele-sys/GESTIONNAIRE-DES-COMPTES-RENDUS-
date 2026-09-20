@@ -576,6 +576,140 @@ body.drawer-open{overflow:hidden;}
 .status-select{min-height:38px;}
 .report-card:hover{transform:none;}
 }
+
+/* ============ CORRECTIF : rien ne doit dépasser de l'écran ============ */
+body{overflow-x:hidden;}
+.form-shell>*,.detail-grid>*,.dash-grid>*,.stack,.field-row2>*,.field-row3>*{min-width:0;}
+.field input,.field select,.field textarea{min-width:0;max-width:100%;}
+.search-box,.search-box input{min-width:0;}
+@media(max-width:1150px){
+.form-shell,.detail-grid,.notes-row{grid-template-columns:minmax(0,1fr);}
+}
+@media(max-width:1000px){
+.dash-grid{grid-template-columns:minmax(0,1fr);}
+}
+
+/* ============ DESIGN : plus de relief et de couleur (charte ADEL) ============ */
+:root{
+--shadow-soft:0 1px 2px rgba(0,79,42,.04), 0 8px 26px rgba(0,79,42,.07);
+--ring:0 0 0 3px rgba(0,131,63,.16);
+--grad-green:linear-gradient(135deg,#00833F 0%,#0A9A4A 100%);
+--grad-deep:linear-gradient(135deg,#004F2A 0%,#00833F 62%,#0A9A4A 100%);
+}
+h1,h2,h3,h4{letter-spacing:-.01em;}
+.card,.stat-card,.report-card,.detail-head{box-shadow:var(--shadow-soft);border-color:#E6EDE7;}
+.card{border-radius:16px;}
+#topbar{background:rgba(255,255,255,.93);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 1px 0 var(--line),0 6px 20px rgba(0,79,42,.05);}
+.search-box{background:#F3F7F3;}
+.search-box:focus-within{border-color:var(--blue-600);box-shadow:var(--ring);background:#fff;}
+
+/* Boutons */
+.btn{border-radius:11px;}
+.btn:active{transform:scale(.98);}
+.btn-primary{background:var(--grad-green);box-shadow:0 3px 10px rgba(0,131,63,.28);}
+.btn-primary:hover{background:linear-gradient(135deg,#006B34 0%,#00833F 100%);}
+.btn-green{background:var(--grad-green);box-shadow:0 3px 10px rgba(0,131,63,.28);}
+.btn:focus-visible,.icon-btn:focus-visible,.nav-item:focus-visible,.chip:focus-visible,.hamburger-btn:focus-visible,.bn-item:focus-visible{outline:2px solid var(--blue-600);outline-offset:2px;}
+
+/* Champs */
+.field input[type=text],.field input[type=date],.field input[type=number],.field textarea,.field select{
+border-radius:11px;padding:11px 13px;border-color:#DCE5DD;
+}
+.field input:focus,.field textarea:focus,.field select:focus,.comment-form textarea:focus{border-color:var(--blue-600);box-shadow:var(--ring);}
+.field input[type=date]{min-height:46px;}
+
+/* Menu latéral */
+#sidebar{box-shadow:1px 0 0 var(--line);}
+#sidebar .brand{background:var(--grad-deep);border-bottom:none;}
+#sidebar .brand-text .b1{color:#fff;}
+#sidebar .brand-text .b2{color:rgba(255,255,255,.78);}
+.nav-item{border-radius:11px;}
+.nav-item.active{background:var(--grad-green);box-shadow:0 4px 12px rgba(0,131,63,.25);}
+.sidebar-footer{background:#F7FAF7;}
+
+/* Accueil : bandeau de bienvenue */
+.page-head.hero{
+background:var(--grad-deep);border-radius:20px;padding:24px 26px;margin-bottom:24px;
+align-items:center;position:relative;overflow:hidden;box-shadow:0 10px 30px rgba(0,79,42,.22);
+}
+.page-head.hero::before{content:"";position:absolute;right:-50px;top:-70px;width:240px;height:240px;border-radius:50%;background:rgba(255,255,255,.08);}
+.page-head.hero::after{content:"";position:absolute;right:110px;bottom:-80px;width:160px;height:160px;border-radius:50%;background:rgba(200,42,43,.30);}
+.page-head.hero>*{position:relative;z-index:1;}
+.page-head.hero h1{color:#fff;font-size:26px;}
+.page-head.hero .sub{color:rgba(255,255,255,.86);}
+.page-head.hero .btn-primary{background:#fff;color:var(--blue-800);box-shadow:0 4px 14px rgba(0,0,0,.18);}
+.page-head.hero .btn-primary svg{stroke:var(--blue-800);}
+.page-head.hero .btn-primary:hover{background:var(--blue-50);}
+
+/* Cartes chiffres */
+.stat-card{position:relative;overflow:hidden;}
+.stat-card::after{content:"";position:absolute;right:-24px;top:-24px;width:96px;height:96px;border-radius:50%;background:var(--blue-50);opacity:.8;}
+.stat-card>*{position:relative;z-index:1;}
+.stat-icon{width:40px;height:40px;border-radius:12px;}
+.stat-card .num{font-size:30px;}
+
+/* Comptes rendus : bandeau de couleur selon le statut */
+.report-card{border-top:4px solid var(--line);}
+.report-card[data-status="publie"]{border-top-color:var(--green-600);}
+.report-card[data-status="en_attente"]{border-top-color:var(--amber-600);}
+.report-card[data-status="brouillon"]{border-top-color:var(--ink-300);}
+.detail-head{border-top:4px solid var(--blue-700);}
+.chip{padding:8px 16px;}
+.chip.active{background:var(--grad-green);border-color:transparent;box-shadow:0 3px 10px rgba(0,131,63,.25);}
+.tasks-table th{background:#F3F7F3;}
+.modal-card{border-radius:20px;}
+.list-row .r-icon{border-radius:11px;}
+
+/* Bouton MENU en haut (icône + mot) */
+.hamburger-btn{
+width:auto;height:44px;padding:0 14px 0 12px;gap:8px;border:none;
+background:var(--grad-green);color:#fff;font-family:var(--font-body);font-size:13.5px;font-weight:700;
+box-shadow:0 3px 10px rgba(0,131,63,.3);
+}
+.hamburger-btn svg{stroke:#fff;}
+@media(max-width:380px){
+.hamburger-btn span{display:none;}
+.hamburger-btn{padding:0 12px;}
+}
+
+/* Barre de navigation en bas (téléphone et tablette) */
+#bottomNav{display:none;}
+@media(max-width:900px){
+#bottomNav{
+display:grid;grid-template-columns:repeat(5,1fr);align-items:end;
+position:fixed;left:0;right:0;bottom:0;z-index:80;
+background:rgba(255,255,255,.97);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+border-top:1px solid var(--line);box-shadow:0 -6px 22px rgba(0,79,42,.09);
+padding:6px 6px calc(6px + env(safe-area-inset-bottom));
+}
+#bottomNav:empty{display:none;}
+.bn-item{
+position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+min-height:54px;padding:6px 2px;border:none;background:none;border-radius:12px;
+color:var(--ink-500);font-family:var(--font-body);font-size:10.5px;font-weight:600;
+-webkit-tap-highlight-color:transparent;touch-action:manipulation;
+}
+.bn-item svg{width:23px;height:23px;}
+.bn-item.active{color:var(--blue-700);}
+.bn-item.active::before{content:"";position:absolute;top:-7px;left:30%;right:30%;height:3px;border-radius:0 0 3px 3px;background:var(--blue-700);}
+.bn-main{color:var(--blue-800);}
+.bn-main::before{display:none;}
+.bn-main .bn-plus{
+width:52px;height:52px;margin-top:-28px;border-radius:50%;border:4px solid #fff;
+background:var(--grad-green);display:flex;align-items:center;justify-content:center;
+box-shadow:0 6px 16px rgba(0,131,63,.42);
+}
+.bn-main .bn-plus svg{stroke:#fff;width:24px;height:24px;}
+#content{padding-bottom:calc(104px + env(safe-area-inset-bottom));}
+.toast-wrap{bottom:calc(88px + env(safe-area-inset-bottom));}
+}
+
+/* Bandeau d'accueil sur téléphone */
+@media(max-width:600px){
+.page-head.hero{padding:20px 18px;border-radius:18px;}
+.page-head.hero h1{font-size:22px;}
+.card{border-radius:14px;}
+}
 </style>
 </head>
 <body>
@@ -599,6 +733,7 @@ body.drawer-open{overflow:hidden;}
 </div>
 </div>
 <div class="toast-wrap" id="toastWrap"></div>
+<nav id="bottomNav" aria-label="Navigation principale"></nav>
 <div id="authScreen" style="display: none;"></div>
 <script>
 const initialAuthHash = window.location.hash;
@@ -986,7 +1121,7 @@ function renderTopbar(){
 const u=currentUser();
 const n=unreadFor(u.id);
 document.getElementById('topbar').innerHTML=`
-<button class="hamburger-btn" id="hamburgerBtn" aria-label="Ouvrir le menu"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+<button class="hamburger-btn" id="hamburgerBtn" aria-label="Ouvrir le menu"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menu</span></button>
 <div class="search-box">${icon('search')}<input placeholder="Rechercher un compte rendu, un projet…" id="globalSearch"></div>
 <div class="topbar-spacer"></div>
 <div class="topbar-right">
@@ -1052,7 +1187,7 @@ const myTasks=DB.tasks.filter(t=>t.assignedTo===u.id && t.status!=='termine');
 const recentReports=[...DB.reports].sort((a,b)=>(b.publishedAt||b.createdAt)-(a.publishedAt||a.createdAt)).slice(0,5);
 const recentNotifs=DB.notifications.filter(n=>n.userId===u.id).sort((a,b)=>b.createdAt-a.createdAt).slice(0,5);
 return `
-<div class="page-head">
+<div class="page-head hero">
 <div>
 <h1>Bonjour, ${u.name.split(' ')[0]} 👋</h1>
 <div class="sub">Voici un aperçu de l'activité terrain de l'entreprise.</div>
@@ -1167,7 +1302,7 @@ comments
 .map(userById)
 .filter(Boolean);
 return `
-<div class="report-card" data-goto-report="${r.id}">
+<div class="report-card" data-status="${r.status}" data-goto-report="${r.id}">
 <div class="rc-top">
 <div>
 <h4>${r.title}</h4>
@@ -2354,10 +2489,31 @@ renderContent();
 }
 }
 }
+const MENU_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
+function renderBottomNav(){
+const bn=document.getElementById('bottomNav');
+if(!bn) return;
+const v=state.view;
+const items=[
+{id:'dashboard',label:'Accueil',icon:'home',on:v==='dashboard'},
+{id:'reports',label:'Comptes',icon:'file',on:v==='reports'||v==='report-detail'},
+{id:'new-report',label:'Nouveau',icon:'plus',main:true,on:v==='new-report'},
+{id:'tasks',label:'Tâches',icon:'tasks',on:v==='tasks'},
+];
+bn.innerHTML=items.map(it=>it.main
+? `<button class="bn-item bn-main ${it.on?'active':''}" data-bn="${it.id}" aria-label="Nouveau compte rendu"><span class="bn-plus">${icon('plus')}</span><span>${it.label}</span></button>`
+: `<button class="bn-item ${it.on?'active':''}" data-bn="${it.id}">${icon(it.icon)}<span>${it.label}</span></button>`
+).join('') + `<button class="bn-item" data-bn="__menu" aria-label="Ouvrir le menu">${MENU_SVG}<span>Menu</span></button>`;
+bn.querySelectorAll('[data-bn]').forEach(b=>b.onclick=()=>{
+if(b.dataset.bn==='__menu'){ toggleMobileSidebar(); }
+else{ closeMobileSidebar(); setView(b.dataset.bn); }
+});
+}
 function render(){
 renderSidebar();
 renderTopbar();
 renderContent();
+renderBottomNav();
 const bd=document.getElementById('sidebarBackdrop');
 if(bd) bd.onclick=closeMobileSidebar;
 }
@@ -2472,6 +2628,8 @@ function renderAuthScreen(mode, errorMsg=''){
 const shell = document.getElementById('shell');
 const el = document.getElementById('authScreen');
 if(shell) shell.style.display='none';
+const bnav=document.getElementById('bottomNav'); if(bnav) bnav.innerHTML='';
+closeMobileSidebar();
 if(!el) return;
 el.style.display='flex';
 el.style.minHeight='100vh';
