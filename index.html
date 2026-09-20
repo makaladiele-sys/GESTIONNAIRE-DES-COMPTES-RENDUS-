@@ -2324,6 +2324,13 @@ pendingPasswordSetup=true;
 }
 const urlCode = new URLSearchParams(window.location.search).get('code');
 if(urlCode){ pendingPasswordSetup = true; }
+const hashParams = new URLSearchParams(initialAuthHash.replace(/^#/,''));
+const searchParams = new URLSearchParams(window.location.search);
+const urlError = hashParams.get('error_description') || searchParams.get('error_description') || hashParams.get('error') || searchParams.get('error');
+if(urlError && !urlCode){
+renderAuthScreen('login', "Lien invalide ou expiré : " + decodeURIComponent(urlError).replace(/\+/g,' ') + ". Demandez à l'administrateur de renvoyer un nouveau lien.");
+return;
+}
 sb.auth.onAuthStateChange((event,session)=>{
 if(!session){
 state.currentUserId=null;
