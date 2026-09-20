@@ -825,14 +825,16 @@ const mapTaskToDb = t => ({id:t.id, title:t.title, project:t.project||null, loca
 const mapNotifFromDb = n => ({id:n.id, userId:n.user_id, reportId:n.report_id, text:n.text, createdAt:n.created_at, read:n.read, isEmail:n.is_email});
 const mapNotifToDb = n => ({id:n.id, user_id:n.userId, report_id:n.reportId||null, text:n.text, created_at:n.createdAt, read:!!n.read, is_email:!!n.isEmail});
 async function sbInsert(table, row){
-if(!sb) return;
+if(!sb) return true;
 const {error} = await sb.from(table).insert(row);
-if(error){ console.error(error); toast("Enregistrement Supabase impossible ("+table+"). Vérifiez votre connexion."); }
+if(error){ console.error(error); toast("Enregistrement impossible ("+table+") : "+(error.message||'erreur inconnue')); return false; }
+return true;
 }
 async function sbUpdate(table, row, id){
 if(!sb) return;
 const {error} = await sb.from(table).update(row).eq('id', id);
-if(error){ console.error(error); toast("Mise à jour Supabase impossible ("+table+")."); }
+if(error){ console.error(error); toast("Mise à jour impossible ("+table+") : "+(error.message||'erreur inconnue')); return false; }
+return true;
 }
 async function sbDelete(table, id){
 if(!sb) return;
@@ -918,6 +920,8 @@ reportFilter:'tous',
 activeReportId:null,
 };
 let pendingPasswordSetup = false;
+let appStartedFor = null;
+let deepLinkReportId = initialReportId;
 function currentUser(){return userById(state.currentUserId);}
 function setView(view,params={}){
 state.view=view;
@@ -1161,7 +1165,9 @@ panel.querySelectorAll('[data-notif-report]').forEach(b=>b.onclick=()=>{
 const n=DB.notifications.find(x=>x.id===b.dataset.notifId);
 if(n) n.read=true;
 panel.remove();
-setView('report-detail',{activeReportId:b.dataset.notifReport});
+const rid=b.dataset.notifReport;
+if(rid && rid!=='null' && rid!=='undefined'){ setView('report-detail',{activeReportId:rid}); }
+else{ toast("Cette notification n'est liée à aucun compte rendu."); }
 });
 markAllRead(u.id);
 const dot=document.querySelector('.bell-wrap .badge-dot');
@@ -1328,12 +1334,44 @@ commentaire${comments.length>1?'s':''}</span>` : ''}
 </div>
 `;
 }
+async function fetchReportById(id){
+state.reportLookup=state.reportLookup||{};
+try{
+const {data,error}=await sb.from('reports').select('*').eq('id',id).maybeSingle();
+if(error) throw error;
+if(data){
+if(!DB.reports.some(x=>x.id===data.id)) DB.reports.unshift(mapReportFromDb(data));
+delete state.reportLookup[id];
+}else{
+state.reportLookup[id]='missing';
+}
+}catch(e){
+console.error('Recherche du compte rendu :',e);
+state.reportLookup[id]='missing';
+state.reportLookupError=(e&&e.message)?e.message:String(e);
+}
+if(state.view==='report-detail' && state.activeReportId===id) renderContent();
+}
+function reportNotFoundHtml(){
+const id=state.activeReportId;
+state.reportLookup=state.reportLookup||{};
+const invalid=!id || id==='null' || id==='undefined';
+if(sb && !invalid && !state.reportLookup[id]){
+state.reportLookup[id]='loading';
+fetchReportById(id);
+}
+if(state.reportLookup[id]==='loading'){
+return `<div class="card"><div class="empty-state">${icon('clock','icon')}<div class="t">Recherche du compte rendu…</div><div class="d">Un instant, nous le cherchons dans la base de données.</div></div></div>`;
+}
+const detail=state.reportLookupError?`<div class="d" style="margin-top:8px;font-size:11.5px;">Détail technique : ${state.reportLookupError}</div>`:'';
+return `<div class="card"><div class="empty-state">${icon('file','icon')}<div class="t">Compte rendu introuvable</div><div class="d">Il a peut-être été supprimé, ou vous n'avez pas la permission de le consulter. Si vous venez d'en créer un, vérifiez qu'aucune erreur d'enregistrement n'est apparue.</div>${detail}<div style="margin-top:16px;"><button class="btn btn-primary" data-nav="reports">${icon('file','icon-sm')} Voir tous les comptes rendus</button></div></div></div>`;
+}
 function viewReportDetail(){
 const r=DB.reports.find(x=>x.id===state.activeReportId);
-if(!r) return `<div class="empty-state">Compte rendu introuvable.</div>`;
+if(!r) return reportNotFoundHtml();
 const u=currentUser();
 const resp=userById(r.responsibleId) || DB.responsables.find(x=>x.id===r.responsibleId) || null;
-const author=userById(r.createdBy);
+const author=userById(r.createdBy) || {id:'',name:'Membre supprimé',fonction:''};
 const canValidate = r.status==='en_attente' && (isSuperAdmin(u) || (u.role==='coordinateur' && r.submittedTo===u.id));
 const canComment = r.status==='publie';
 const canEdit = isSuperAdmin(u) || r.createdBy===u.id || (isCoordOrAbove(u) && (r.submittedTo===u.id || !r.submittedTo));
@@ -1432,7 +1470,7 @@ ${r.customSections.map(s=>`
 <div class="card card-pad">
 <div class="section-title"><div class="ic" style="background:var(--blue-50)">${icon('comment','icon-sm',getComputedStyle(document.documentElement).getPropertyValue('--blue-700'))}</div><h3>Commentaires ${r.comments.length?`(${r.comments.length})`:''}</h3></div>
 ${r.comments.length? r.comments.map(c=>{
-const a=userById(c.authorId);
+const a=userById(c.authorId) || {id:'',name:'Membre supprimé'};
 return `<div class="comment">
 <div class="avatar" style="background:${colorFor(a.id)};width:32px;height:32px;font-size:11.5px;">${initials(a.name)}</div>
 <div class="c-body">
@@ -2308,24 +2346,32 @@ state.editingReportId=null;
 setView('report-detail',{activeReportId:editing.id});
 };
 }else{
-document.getElementById('submitReportBtn').onclick=()=>{
+document.getElementById('submitReportBtn').onclick=async()=>{
 if(!DB.responsables.some(r=>r.actif!==false)){toast('Aucun responsable actif n’est disponible. Le coordinateur doit d’abord compléter ou réactiver la liste.');return;}
 if(!document.getElementById('f-responsible')?.value){toast('Veuillez sélectionner un responsable de mission.');return;}
 if(!document.getElementById('f-coordinateur')?.value){toast('Veuillez sélectionner le coordinateur destinataire.');return;}
+if(photoStore.some(p=>p.uploading)){toast('Patientez : une photo est encore en cours de téléversement.');return;}
+const submitBtn=document.getElementById('submitReportBtn');
 const report=collectReport('en_attente');
+submitBtn.disabled=true;
+const saved=await sbInsert('reports', mapReportToDb(report));
+if(!saved){ submitBtn.disabled=false; return; }
 DB.reports.unshift(report);
 notifyCoordinators(report);
 toast('Compte rendu envoyé au coordinateur pour validation.');
-sbInsert('reports', mapReportToDb(report));
 setView('report-detail',{activeReportId:report.id});
 };
-document.getElementById('draftReportBtn').onclick=()=>{
+document.getElementById('draftReportBtn').onclick=async()=>{
 if(!DB.responsables.some(r=>r.actif!==false)){toast('Aucun responsable actif n’est disponible. Le coordinateur doit d’abord compléter ou réactiver la liste.');return;}
 if(!document.getElementById('f-responsible')?.value){toast('Veuillez sélectionner un responsable de mission.');return;}
+if(photoStore.some(p=>p.uploading)){toast('Patientez : une photo est encore en cours de téléversement.');return;}
+const draftBtn=document.getElementById('draftReportBtn');
 const report=collectReport('brouillon');
+draftBtn.disabled=true;
+const saved=await sbInsert('reports', mapReportToDb(report));
+if(!saved){ draftBtn.disabled=false; return; }
 DB.reports.unshift(report);
 toast('Brouillon enregistré. Vous pourrez le compléter plus tard.');
-sbInsert('reports', mapReportToDb(report));
 setView('reports');
 };
 }
@@ -2843,6 +2889,7 @@ async function logout(){
 await sb.auth.signOut();
 }
 async function startApp(){
+appStartedFor=state.currentUserId;
 try{
 await loadProfiles();
 await loadFromSupabase();
@@ -2852,8 +2899,10 @@ toast("Connexion à Supabase impossible.");
 }
 document.getElementById('authScreen').style.display='none';
 document.getElementById('shell').style.display='flex';
-if(initialReportId){
-setView('report-detail',{activeReportId:initialReportId});
+if(deepLinkReportId){
+const rid=deepLinkReportId;
+deepLinkReportId=null;
+setView('report-detail',{activeReportId:rid});
 }else{
 render();
 }
@@ -2880,13 +2929,14 @@ return;
 sb.auth.onAuthStateChange((event,session)=>{
 if(!session){
 state.currentUserId=null;
+appStartedFor=null;
 if(!urlCode && !tokenHash){ renderAuthScreen('login'); }
 return;
 }
 state.currentUserId=session.user.id;
 if(pendingPasswordSetup){
 renderAuthScreen('set-password');
-}else{
+}else if(appStartedFor!==session.user.id){
 startApp();
 }
 });
