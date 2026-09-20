@@ -2323,18 +2323,20 @@ if(initialAuthHash.includes('type=invite') || initialAuthHash.includes('type=rec
 pendingPasswordSetup=true;
 }
 const urlCode = new URLSearchParams(window.location.search).get('code');
-if(urlCode){ pendingPasswordSetup = true; }
 const hashParams = new URLSearchParams(initialAuthHash.replace(/^#/,''));
 const searchParams = new URLSearchParams(window.location.search);
+const tokenHash = hashParams.get('token_hash') || searchParams.get('token_hash');
+const otpType = hashParams.get('type') || searchParams.get('type') || 'recovery';
+if(urlCode || tokenHash){ pendingPasswordSetup = true; }
 const urlError = hashParams.get('error_description') || searchParams.get('error_description') || hashParams.get('error') || searchParams.get('error');
-if(urlError && !urlCode){
+if(urlError && !urlCode && !tokenHash){
 renderAuthScreen('login', "Lien invalide ou expiré : " + decodeURIComponent(urlError).replace(/\+/g,' ') + ". Demandez à l'administrateur de renvoyer un nouveau lien.");
 return;
 }
 sb.auth.onAuthStateChange((event,session)=>{
 if(!session){
 state.currentUserId=null;
-if(!urlCode){ renderAuthScreen('login'); }
+if(!urlCode && !tokenHash){ renderAuthScreen('login'); }
 return;
 }
 state.currentUserId=session.user.id;
@@ -2344,7 +2346,14 @@ renderAuthScreen('set-password');
 startApp();
 }
 });
-if(urlCode){
+if(tokenHash){
+const { error } = await sb.auth.verifyOtp({ token_hash: tokenHash, type: otpType });
+if(error){
+console.error('verifyOtp', error);
+renderAuthScreen('login', "Lien invalide ou expiré : " + error.message + ". Demandez à l'administrateur de renvoyer un nouveau lien.");
+}
+window.history.replaceState({}, document.title, window.location.pathname + (initialReportId?('?report='+initialReportId):''));
+}else if(urlCode){
 const { error } = await sb.auth.exchangeCodeForSession(window.location.href);
 if(error){
 console.error('exchangeCodeForSession', error);
