@@ -1026,7 +1026,8 @@ panel.remove();
 setView('report-detail',{activeReportId:b.dataset.notifReport});
 });
 markAllRead(u.id);
-renderTopbar();
+const dot=document.querySelector('.bell-wrap .badge-dot');
+if(dot) dot.remove();
 setTimeout(()=>{
 const closeOnOutside=(ev)=>{
 if(!panel.contains(ev.target) && ev.target.id!=='bellBtn'){
