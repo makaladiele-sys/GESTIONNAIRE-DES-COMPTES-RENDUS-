@@ -1862,16 +1862,22 @@ function renderPhotoThumbs(){
 const wrap=document.getElementById('photoThumbs');
 wrap.innerHTML=photoStore.map((p,i)=>`
 <div class="photo-thumb">
-<img src="${p.url}">
-<input type="text" data-photo-caption="${i}" placeholder="Légende de la photo…" value="${p.caption.replace(/"/g,'&quot;')}">
-<button type="button" class="rm-btn" data-photo-rm="${i}">${icon('trash','icon-sm')}</button>
+${p.uploading? `<div style="width:58px;height:58px;border-radius:7px;flex-shrink:0;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink-400);">…</div>` : `<img src="${p.url}">`}
+<input type="text" data-photo-caption="${i}" placeholder="Légende de la photo…" value="${(p.caption||'').replace(/"/g,'&quot;')}" ${p.uploading?'disabled':''}>
+<button type="button" class="rm-btn" data-photo-rm="${i}" ${p.uploading?'disabled':''}>${icon('trash','icon-sm')}</button>
 </div>
 `).join('');
 wrap.querySelectorAll('[data-photo-caption]').forEach(inp=>{
 inp.oninput=(e)=>{photoStore[+e.target.dataset.photoCaption].caption=e.target.value;};
 });
 wrap.querySelectorAll('[data-photo-rm]').forEach(btn=>{
-btn.onclick=(e)=>{photoStore.splice(+e.target.closest('button').dataset.photoRm,1);renderPhotoThumbs();};
+btn.onclick=async(e)=>{
+const idx=+e.target.closest('button').dataset.photoRm;
+const p=photoStore[idx];
+if(p.storagePath && sb){ await sb.storage.from('report-photos').remove([p.storagePath]); }
+photoStore.splice(idx,1);
+renderPhotoThumbs();
+};
 });
 }
 function addResultRow(data={indicateur:'',prevision:'',realisation:''}){
@@ -1918,7 +1924,7 @@ content:row.querySelector('.cs-content').value.trim(),
 }
 function wireNewReportForm(){
 const editing = DB.reports.find(x=>x.id===state.editingReportId);
-photoStore = editing ? editing.photos.map(p=>({url:p.url,caption:p.caption||''})) : [];
+photoStore = editing ? editing.photos.map(p=>({url:p.url,caption:p.caption||'',storagePath:p.storagePath||null})) : [];
 ['objList','stepList','strengthsList','issuesList','recsList'].forEach(id=>document.getElementById(id).innerHTML='');
 document.getElementById('customSectionsList').innerHTML='';
 if(editing){
@@ -1961,13 +1967,29 @@ document.getElementById('addIssue').onclick=()=>makeDynRow(document.getElementBy
 document.getElementById('addRec').onclick=()=>makeDynRow(document.getElementById('recsList'),'Recommandation…');
 document.getElementById('addResult').onclick=()=>addResultRow();
 document.getElementById('addCustomSection').onclick=()=>makeCustomSectionRow(document.getElementById('customSectionsList'));
-document.getElementById('photoInput').onchange=(e)=>{
-[...e.target.files].forEach(file=>{
-const reader=new FileReader();
-reader.onload=(ev)=>{ photoStore.push({url:ev.target.result,caption:''}); renderPhotoThumbs(); };
-reader.readAsDataURL(file);
-});
+document.getElementById('photoInput').onchange=async(e)=>{
+const files=[...e.target.files];
 e.target.value='';
+for(const file of files){
+if(!sb){ toast('Supabase indisponible — impossible de téléverser la photo.'); continue; }
+const placeholder={url:'',caption:'',uploading:true};
+photoStore.push(placeholder);
+renderPhotoThumbs();
+const ext=(file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
+const path=`${state.currentUserId}/${uid('photo')}.${ext}`;
+const {error:upErr}=await sb.storage.from('report-photos').upload(path,file,{cacheControl:'3600',upsert:false});
+const idx=photoStore.indexOf(placeholder);
+if(upErr){
+console.error('upload photo',upErr);
+toast('Échec du téléversement de la photo.');
+if(idx>-1) photoStore.splice(idx,1);
+renderPhotoThumbs();
+continue;
+}
+const {data:pub}=sb.storage.from('report-photos').getPublicUrl(path);
+if(idx>-1) photoStore[idx]={url:pub.publicUrl, caption:'', storagePath:path, uploading:false};
+renderPhotoThumbs();
+}
 };
 function collectReport(status){
 const title=document.getElementById('f-title').value.trim()||'Compte rendu sans titre';
@@ -1996,7 +2018,7 @@ dateHoraires:document.getElementById('f-dates').value.trim(),
 etapes:getDynValues(document.getElementById('stepList')),
 methodes:document.getElementById('f-methodes').value.trim(),
 moyens:document.getElementById('f-moyens').value.trim(),
-photos:photoStore.map(p=>({url:p.url,caption:p.caption||'Photo de la visite'})),
+photos:photoStore.filter(p=>!p.uploading).map(p=>({url:p.url,caption:p.caption||'Photo de la visite',storagePath:p.storagePath||null})),
 resultats:results,
 pointsForts:getDynValues(document.getElementById('strengthsList')),
 difficultes:getDynValues(document.getElementById('issuesList')),
