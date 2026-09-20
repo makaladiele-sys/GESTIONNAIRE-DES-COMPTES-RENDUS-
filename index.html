@@ -1520,6 +1520,7 @@ ${list.map(m=>`
 <td>${m.id===u.id || m.role==='super_admin' ? '' : `<div class="row-actions">
 <button class="icon-btn icon-btn-sm" data-edit-user="${m.id}" title="Modifier">${icon('edit','icon-sm')}</button>
 <button class="icon-btn icon-btn-sm ${m.role==='coordinateur'?'success':''}" data-toggle-role="${m.id}" title="${m.role==='coordinateur'?'Retirer coordinateur':'Désigner coordinateur'}">${icon('userBadge','icon-sm')}</button>
+<button class="icon-btn icon-btn-sm" data-resend-activation="${m.id}" title="Renvoyer le lien d'activation">${icon('send','icon-sm')}</button>
 <button class="icon-btn icon-btn-sm" data-toggle-user="${m.id}" title="${m.actif===false?'Réactiver':'Désactiver'}">${icon(m.actif===false?'check':'x','icon-sm')}</button>
 <button class="icon-btn icon-btn-sm danger" data-del-user="${m.id}" title="Supprimer">${icon('trash','icon-sm')}</button>
 </div>`}</td>
@@ -1718,6 +1719,24 @@ document.querySelectorAll('[data-toggle-user]').forEach(b=>b.onclick=async()=>{
 const t=DB.users.find(x=>x.id===b.dataset.toggleUser); if(!t) return;
 const r=await callManageMember({action:'toggle_active', userId:t.id});
 if(r){ toast(r.actif?`${t.name} réactivé.`:`${t.name} désactivé.`); await loadProfiles(); render(); }
+});
+document.querySelectorAll('[data-resend-activation]').forEach(b=>b.onclick=async()=>{
+const t=DB.users.find(x=>x.id===b.dataset.resendActivation); if(!t) return;
+const waWindow = window.open('', '_blank');
+const r=await callManageMember({action:'resend_activation', userId:t.id});
+if(!r){ if(waWindow) waWindow.close(); return; }
+toast(`Nouveau lien généré pour ${t.name}.`);
+if(r.whatsappUrl){
+if(waWindow){ waWindow.location.href=r.whatsappUrl; }
+else{
+const fallback=document.createElement('div');
+fallback.className='toast';
+fallback.style.background='#25D366';
+fallback.innerHTML=`<a href="${r.whatsappUrl}" target="_blank" rel="noopener" style="color:#fff;font-weight:600;">${icon('whatsapp','icon-sm')} Ouvrir WhatsApp pour ${t.name}</a>`;
+document.getElementById('toastWrap').appendChild(fallback);
+setTimeout(()=>{fallback.style.opacity='0';fallback.style.transition='opacity .3s';setTimeout(()=>fallback.remove(),300);},12000);
+}
+}else{ if(waWindow) waWindow.close(); }
 });
 document.querySelectorAll('[data-del-user]').forEach(b=>b.onclick=async()=>{
 const t=DB.users.find(x=>x.id===b.dataset.delUser); if(!t) return;
