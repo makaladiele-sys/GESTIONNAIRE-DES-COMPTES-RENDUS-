@@ -1355,7 +1355,7 @@ const author=userById(r.createdBy) || {id:'',name:'Membre supprimé',fonction:''
 const canValidate = r.status==='en_attente' && (isSuperAdmin(u) || (u.role==='coordinateur' && r.submittedTo===u.id));
 const canComment = r.status==='publie';
 const canEdit = isSuperAdmin(u) || r.createdBy===u.id || (isCoordOrAbove(u) && (r.submittedTo===u.id || !r.submittedTo));
-const canDelete = isSuperAdmin(u) || (isCoordOrAbove(u) && (r.submittedTo===u.id || !r.submittedTo)) || (r.createdBy===u.id && r.status==='brouillon');
+const canDelete = isSuperAdmin(u) || r.createdBy===u.id;
 return `
 ${r.status==='en_attente'?`
 <div class="validate-bar">
