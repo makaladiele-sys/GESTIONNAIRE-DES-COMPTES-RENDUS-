@@ -979,7 +979,7 @@ return result;
 async function notifyAllMembers(report){
 const author=userById(report.createdBy);
 const recipients=DB.users.filter(
-u=>u.id!==report.createdBy && u.email
+u=>u.id!==report.createdBy
 );
 const newNotifs=recipients.map(u=>({
 id:uid('n'),
@@ -988,7 +988,7 @@ reportId:report.id,
 text:`${author.name} a publié le compte rendu « ${report.title} »`,
 createdAt:Date.now(),
 read:false,
-isEmail:true
+isEmail:false
 }));
 DB.notifications.push(...newNotifs);
 if(sb){
@@ -1012,7 +1012,7 @@ reportId:report.id,
 text:`${author.name} a soumis « ${report.title} » pour validation`,
 createdAt:Date.now(),
 read:false,
-isEmail:true
+isEmail:false
 }));
 DB.notifications.push(...newNotifs);
 if(sb){
@@ -1020,38 +1020,15 @@ for(const n of newNotifs){
 await sbInsert('notifications', mapNotifToDb(n));
 }
 }
-for(const member of recipients){
-if(!member.email) continue;
-const subject=
-`Compte rendu à valider — ${report.title}`;
-const html=`
-<div style="font-family:Arial,sans-serif;max-width:650px;margin:auto;line-height:1.6">
-<h2>Compte rendu à valider</h2>
-<p>Bonjour ${member.name || ''},</p>
-<p>
-${author.name} a soumis le compte rendu
-<strong>« ${report.title} »</strong>
-pour validation.
-</p>
-<p>
-Merci de le consulter dans le Gestionnaire des comptes rendus.
-</p>
-<p>
-Cordialement,<br>
-<strong>Gestionnaire des comptes rendus</strong>
-</p>
-</div>
-`;
-try{
-await sendRealEmail(
-member.email,
-subject,
-html
-);
-}catch(err){
-console.error('Erreur envoi e-mail coordinateur:', err);
 }
-}
+function whatsappSubmitLink(report){
+const coord=DB.users.find(u=>u.id===report.submittedTo);
+if(!coord) return null;
+const norm=coord.phoneNormalized || normalizePhoneSN(coord.phone||'');
+if(!norm) return null;
+const link=`${window.location.origin}${window.location.pathname}?report=${report.id}`;
+const msg=`Bonjour ${coord.name},\n\nUn nouveau compte rendu « ${report.title} » vous a été envoyé pour validation.\n\nConsultez-le ici (connectez-vous si besoin) :\n${link}`;
+return `https://wa.me/${norm}?text=${encodeURIComponent(msg)}`;
 }
 function unreadFor(userId){return DB.notifications.filter(n=>n.userId===userId && !n.read).length;}
 function markAllRead(userId){
@@ -2355,13 +2332,17 @@ if(!document.getElementById('f-responsible')?.value){toast('Veuillez sélectionn
 if(!document.getElementById('f-coordinateur')?.value){toast('Veuillez sélectionner le coordinateur destinataire.');return;}
 if(photoStore.some(p=>p.uploading)){toast('Patientez : une photo est encore en cours de téléversement.');return;}
 const submitBtn=document.getElementById('submitReportBtn');
+const waWindow=window.open('','_blank');
 const report=collectReport('en_attente');
 submitBtn.disabled=true;
 const saved=await sbInsert('reports', mapReportToDb(report));
-if(!saved){ submitBtn.disabled=false; return; }
+if(!saved){ if(waWindow) waWindow.close(); submitBtn.disabled=false; return; }
 DB.reports.unshift(report);
 notifyCoordinators(report);
 toast('Compte rendu envoyé au coordinateur pour validation.');
+const waLink=whatsappSubmitLink(report);
+if(waLink && waWindow){ waWindow.location.href=waLink; }
+else if(waWindow){ waWindow.close(); }
 setView('report-detail',{activeReportId:report.id});
 };
 document.getElementById('draftReportBtn').onclick=async()=>{
@@ -2446,7 +2427,7 @@ toast('Compte rendu introuvable.','error');
 return;
 }
 validateBtn.disabled=true;
-validateBtn.textContent='Envoi en cours...';
+validateBtn.textContent='Validation en cours...';
 try{
 r.status='publie';
 r.publishedAt=Date.now();
@@ -2459,10 +2440,13 @@ published_at:r.publishedAt
 r.id
 );
 await notifyAllMembers(r);
-toast(
-'Compte rendu validé et envoyé par e-mail aux membres.',
-'mail'
-);
+if(!r.isShared){
+r.isShared=true;
+r.sharedAt=Date.now();
+if(!r.shareToken) r.shareToken=uid('share');
+await sbUpdate('reports', {is_shared:true, shared_at:r.sharedAt, share_token:r.shareToken}, r.id);
+}
+toast('Compte rendu validé. Cliquez sur « Partager » pour l\'envoyer par WhatsApp.');
 renderContent();
 renderTopbar();
 renderSidebar();
@@ -2472,7 +2456,7 @@ console.error(
 error
 );
 toast(
-'Erreur lors de l’envoi du compte rendu par e-mail.',
+'Erreur lors de la validation du compte rendu.',
 'error'
 );
 validateBtn.disabled=false;
