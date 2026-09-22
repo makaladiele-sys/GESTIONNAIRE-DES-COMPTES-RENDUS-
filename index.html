@@ -1317,7 +1317,10 @@ return `
 <h4>${r.title}</h4>
 <div class="rc-proj">${r.project}</div>
 </div>
+<div style="display:flex;align-items:center;gap:6px;">
 ${statusBadge(r.status)}
+<button class="icon-btn icon-btn-sm" data-pdf-report="${r.id}" title="Télécharger PDF">${icon('download','icon-sm')}</button>
+</div>
 </div>
 <div class="rc-meta">
 <div>${icon('calendar','icon-sm')} ${fmtDateShort(r.periodStart)}${r.periodEnd&&r.periodEnd!==r.periodStart?' – '+fmtDateShort(r.periodEnd):''}</div>
@@ -2389,6 +2392,23 @@ c.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>setView(b.dataset.nav)
 c.querySelectorAll('[data-goto-report]').forEach(b=>b.onclick=()=>setView('report-detail',{activeReportId:b.dataset.gotoReport}));
 c.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{state.reportFilter=b.dataset.filter;renderContent();});
 c.querySelectorAll('[data-edit-report]').forEach(b=>b.onclick=()=>setView('new-report',{editingReportId:b.dataset.editReport}));
+c.querySelectorAll('[data-pdf-report]').forEach(b=>b.onclick=async(ev)=>{
+ev.stopPropagation();
+const rep=DB.reports.find(x=>x.id===b.dataset.pdfReport);
+if(!rep) return;
+const original=b.innerHTML;
+b.disabled=true;
+b.innerHTML=icon('clock','icon-sm');
+try{
+await downloadReportPdf(rep);
+toast('PDF téléchargé.');
+}catch(err){
+console.error('Erreur PDF :',err);
+toast('Impossible de créer le PDF : '+(err&&err.message?err.message:'erreur inconnue'),'error');
+}
+b.disabled=false;
+b.innerHTML=original;
+});
 if(state.view==='new-report') wireNewReportForm();
 if(state.view==='tasks'){
 const addBtn=document.getElementById('addTaskBtn');
