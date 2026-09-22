@@ -1353,8 +1353,8 @@ const u=currentUser();
 const resp=userById(r.responsibleId) || DB.responsables.find(x=>x.id===r.responsibleId) || null;
 const author=userById(r.createdBy) || {id:'',name:'Membre supprimé',fonction:''};
 const canValidate = r.status==='en_attente' && (isSuperAdmin(u) || (u.role==='coordinateur' && r.submittedTo===u.id));
-const canComment = r.status==='publie';
-const canEdit = isSuperAdmin(u) || r.createdBy===u.id || (isCoordOrAbove(u) && (r.submittedTo===u.id || !r.submittedTo));
+const canComment = r.status==='publie' || (r.status==='en_attente' && (canValidate || r.createdBy===u.id));
+const canEdit = isSuperAdmin(u) || r.createdBy===u.id;
 const canDelete = isSuperAdmin(u) || r.createdBy===u.id;
 return `
 ${r.status==='en_attente'?`
