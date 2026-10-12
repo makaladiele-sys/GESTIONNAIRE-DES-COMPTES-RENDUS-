@@ -3178,6 +3178,7 @@ ${isSetPw ? `
 <div class="field"><label for="authPw">Mot de passe</label><input id="authPw" type="password" placeholder="Votre mot de passe" autocomplete="current-password"></div>
 <button class="submit" id="authSubmit" type="button">Se connecter</button>
 `}
+${!isSetPw ? `<p class="footnote" style="margin:14px 0 0"><a href="#" id="forgotPw" style="color:#1b241d;border-bottom:1px solid var(--clay);text-decoration:none">Mot de passe oublié ?</a></p>` : ''}
 <div id="authError" class="auth-error">${errorMsg || ''}</div>
 ${!isSetPw ? `<p class="footnote">Pas de compte ? Demandez une invitation à votre coordinateur.</p>` : ''}
 </div>
@@ -3186,6 +3187,16 @@ ${!isSetPw ? `<p class="footnote">Pas de compte ? Demandez une invitation à vot
 const submit = isSetPw ? submitSetPassword : submitLogin;
 const submitBtn = document.getElementById('authSubmit');
 if(submitBtn){ submitBtn.onclick = submit; }
+const forgot=document.getElementById('forgotPw');
+if(forgot) forgot.onclick=async(e)=>{
+  e.preventDefault();
+  const errEl=document.getElementById('authError');
+  const email=document.getElementById('authEmail').value.trim();
+  if(!email){ errEl.textContent="Saisissez votre e-mail ci-dessus, puis recliquez."; return; }
+  const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+window.location.pathname});
+  errEl.style.color=error?'#b42318':'#2e7d32';
+  errEl.textContent=error?error.message:"E-mail de réinitialisation envoyé.";
+};
 el.querySelectorAll('input').forEach(inp=>{
 inp.addEventListener('keydown',e=>{ if(e.key === 'Enter'){ e.preventDefault(); submit(); } });
 });
